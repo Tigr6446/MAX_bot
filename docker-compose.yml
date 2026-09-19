@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16
+    container_name: max_bot_postgres
+    environment:
+      POSTGRES_USER: maxbot
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-localpass}
+      POSTGRES_DB: max_bot
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maxbot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  bot:
+    build: .
+    container_name: max_bot_app
+    environment:
+      DATABASE_URL: postgresql+asyncpg://maxbot:${DB_PASSWORD:-localpass}@db:5432/max_bot
+      MAX_BOT_TOKEN: ${MAX_BOT_TOKEN}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
