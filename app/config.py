@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     public_url: str = "http://localhost:8000"
     database_url: str
     my_user_id: int
+    target_channel_id: str 
 
     @property
     def async_database_url(self) -> str:
