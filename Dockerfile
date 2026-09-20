@@ -2,7 +2,12 @@ FROM python:3.12-slim
 
 # Устанавливаем системные зависимости для asyncpg и сборки
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev \
+    gcc libpq-dev wget ca-certificates \
+    && wget https://gu-st.ru/content/lending/russian_trusted_root_ca_pem.crt \
+       -O /usr/local/share/ca-certificates/russian_trusted_root_ca.crt \
+    && wget https://gu-st.ru/content/lending/russian_trusted_sub_ca_pem.crt \
+       -O /usr/local/share/ca-certificates/russian_trusted_sub_ca.crt \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
