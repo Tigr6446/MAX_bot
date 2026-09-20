@@ -16,6 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 async def handle_channel_message(event: MessageCreated) -> None:
+    
+    logger.info(
+        "Пришло сообщение: chat=%r, chat_id=%r, text=%r",
+        event.chat,
+        getattr(event.chat, "chat_id", None) or getattr(event.chat, "id", None),
+        event.message.body.text if event.message.body else None,
+    )
+
+
     # 1. Текст сообщения
     text = event.message.body.text if event.message.body else None
 
