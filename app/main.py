@@ -3,8 +3,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from maxapi import Dispatcher, Router
 from maxapi.filters.command import Command
+from maxapi.webhook.fastapi import FastAPIMaxWebhook
 
 from app.bot_instance import bot
+from app.config import settings
 from app.database import init_db
 from app.handlers.channel import handle_channel_message
 from app.handlers.start import cmd_start
@@ -19,13 +21,22 @@ async def lifespan(app: FastAPI):
 dp = Dispatcher()
 router = Router()
 
-# Регистрация хендлеров
 router.message_created(Command("start"))(cmd_start)
 router.message_created()(handle_channel_message)
 
 dp.include_routers(router)
 
-app = FastAPI(lifespan=lifespan)
+# Создаём вебхук-интеграцию
+webhook = FastAPIMaxWebhook(
+    dp=dp,
+    bot=bot,
+    secret=settings.webhook_secret,
+)
+
+app = FastAPI(lifespan=webhook.lifespan)
+
+# Подключаем вебхук к приложению
+webhook.setup(app, path="/webhook")
 
 
 @app.get("/health")
