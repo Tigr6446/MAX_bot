@@ -1,63 +1,63 @@
 """
-Модуль парсинга сообщений из каналов MAX
-Ловит новые сообщения, определяет категорию через эвристику,
-пересылает оригинал пользователю в ЛС и сохраняет запись в БД
+РњРѕРґСѓР»СЊ РїР°СЂСЃРёРЅРіР° СЃРѕРѕР±С‰РµРЅРёР№ РёР· РєР°РЅР°Р»РѕРІ MAX.
 """
 
 import logging
-from venv import logger
 
 from maxapi.types import MessageCreated
 
 from app.config import settings
 from app.HeuristicAnalyzer import analyzer
 from app.database import async_session
-from app.database import ParsedMessage
-from app.main import bot
-#from app.bot_instance import bot переделка на будущее, мб поменять надо будет
+from app.models import ParsedMessage
+from app.bot_instance import bot
 
-logger = logging.getLogger(__name__)
 
-async def handle_Channel_message(message: MessageCreated):
+logger = logging.getLogger(name)
+
+
+async def handle_channel_message(message: MessageCreated):
     """
-    Отсматривает сообщения, анализирует текст эврестическим модулем
-    пересылает оригинал в ЛС и сохраняет запись в БД
+    Р›РѕРІРёС‚ СЃРѕРѕР±С‰РµРЅРёСЏ РёР· РєР°РЅР°Р»Р°, Р°РЅР°Р»РёР·РёСЂСѓРµС‚ С‚РµРєСЃС‚ СЌРІСЂРёСЃС‚РёРєРѕР№,
+    РїРµСЂРµСЃС‹Р»Р°РµС‚ РѕСЂРёРіРёРЅР°Р» РІ Р›РЎ Рё СЃРѕС…СЂР°РЅСЏРµС‚ Р·Р°РїРёСЃСЊ РІ Р‘Р”.
     """
-    #1 Текст
+
+    # в”Ђв”Ђв”Ђ 1. РўРµРєСЃС‚ в”Ђв”Ђв”Ђ
     text = message.body.text if message.body and message.body.text else None
-    
-    #2 Эвристический модуль
+
+    # в”Ђв”Ђв”Ђ 2. Р­РІСЂРёСЃС‚РёРєР° в”Ђв”Ђв”Ђ
     category = analyzer.analyze(text) if text else None
     category_label = (
-        f"Категория: {category}" if category
-        else "Категория: не определена"
-        )
-    #3 Проверка получателя
+        f"рџЋЇ РљР°С‚РµРіРѕСЂРёСЏ: {category}" if category
+        else "вќ“ РљР°С‚РµРіРѕСЂРёСЏ: РЅРµ РѕРїСЂРµРґРµР»РµРЅР°"
+    )
+
+    # в”Ђв”Ђв”Ђ 3. РџСЂРѕРІРµСЂРєР° РїРѕР»СѓС‡Р°С‚РµР»СЏ в”Ђв”Ђв”Ђ
     if not settings.MY_USER_ID:
-        logger.warning("MY_USER_ID не задан в .env — пересылка пропущена")
+        logger.warning("MY_USER_ID РЅРµ Р·Р°РґР°РЅ РІ .env вЂ” РїРµСЂРµСЃС‹Р»РєР° РїСЂРѕРїСѓС‰РµРЅР°")
         return
 
-     #4 Пересылка оригинала в ЛС
+    # в”Ђв”Ђв”Ђ 4. РџРµСЂРµСЃС‹Р»РєР° РѕСЂРёРіРёРЅР°Р»Р° РІ Р›РЎ в”Ђв”Ђв”Ђ
     try:
         await message.forward(user_id=settings.MY_USER_ID)
         logger.info(
-            "Сообщение переслано. Категория: %s",
-            category or "не определена"
+            "РЎРѕРѕР±С‰РµРЅРёРµ РїРµСЂРµСЃР»Р°РЅРѕ. РљР°С‚РµРіРѕСЂРёСЏ: %s",
+            category or "РЅРµ РѕРїСЂРµРґРµР»РµРЅР°"
         )
     except Exception as e:
-        logger.exception("Не удалось переслать: %s", e)
+        logger.exception("РќРµ СѓРґР°Р»РѕСЃСЊ РїРµСЂРµСЃР»Р°С‚СЊ: %s", e)
         return
 
-    #5 Подпись с категорией
+    # в”Ђв”Ђв”Ђ 5. РџРѕРґРїРёСЃСЊ СЃ РєР°С‚РµРіРѕСЂРёРµР№ в”Ђв”Ђв”Ђ
     try:
         await bot.send_message(
             chat_id=settings.MY_USER_ID,
             text=category_label,
         )
     except Exception as e:
-        logger.exception("Не удалось отправить подпись: %s", e)
+        logger.exception("РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РїСЂР°РІРёС‚СЊ РїРѕРґРїРёСЃСЊ: %s", e)
 
-    #6 Сохранение в БД
+    # в”Ђв”Ђв”Ђ 6. РЎРѕС…СЂР°РЅРµРЅРёРµ РІ Р‘Р” в”Ђв”Ђв”Ђ
     if category:
         try:
             channel_id = str(
@@ -68,10 +68,10 @@ async def handle_Channel_message(message: MessageCreated):
             async with async_session() as session:
                 session.add(ParsedMessage(
                     channel_id=channel_id,
-                    message_text=text or "[медиа без текста]",
+                    message_text=text or "[РјРµРґРёР° Р±РµР· С‚РµРєСЃС‚Р°]",
                     category=category,
                 ))
                 await session.commit()
-            logger.info("Запись сохранена в БД: %s", category)
+            logger.info("Р—Р°РїРёСЃСЊ СЃРѕС…СЂР°РЅРµРЅР° РІ Р‘Р”: %s", category)
         except Exception as e:
-            logger.exception("Ошибка сохранения в БД: %s", e)
+            logger.exception("РћС€РёР±РєР° СЃРѕС…СЂР°РЅРµРЅРёСЏ РІ Р‘Р”: %s", e)
