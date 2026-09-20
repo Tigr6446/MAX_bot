@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     webhook_secret: str = "change_me"
     public_url: str = "http://localhost:8000"
     database_url: str
+    my_user_id: int
 
     @property
     def async_database_url(self) -> str:

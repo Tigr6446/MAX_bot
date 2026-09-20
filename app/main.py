@@ -1,25 +1,29 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from maxapi import Bot, Dispatcher
-from maxapi.filters.command import CommandStart
+from maxapi import Dispatcher, Router
+from maxapi.filters.command import Command
 
-from app.config import settings
+from app.bot_instance import bot
 from app.database import init_db
+from app.handlers.channel import handle_channel_message
 from app.handlers.start import cmd_start
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Создаём таблицы при старте
     await init_db()
     yield
 
 
-bot = Bot(settings.max_bot_token)
 dp = Dispatcher()
-dp.message_created(CommandStart())(cmd_start)
+router = Router()
 
+# Регистрация хендлеров
+router.message_created(Command("start"))(cmd_start)
+router.message_created()(handle_channel_message)
+
+dp.include_routers(router)
 
 app = FastAPI(lifespan=lifespan)
 
