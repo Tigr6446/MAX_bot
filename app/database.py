@@ -3,8 +3,9 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
-
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, DateTime, func
+from datetime import datetime
 from app.config import settings
 
 
@@ -36,3 +37,14 @@ async def init_db() -> None:
     """Создаёт таблицы при старте приложения."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+class ParsedMessage(Base):
+    __tablename__ = "parsed_message"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    channel_id: Mapped[str] = mapped_column(String(100))
+    message_text: Mapped[str] = mapped_column(String(6000))
+    category: Mapped[str] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+        )
