@@ -9,11 +9,11 @@ from maxapi.types import MessageCreated
 from app.config import settings
 from app.HeuristicAnalyzer import analyzer
 from app.database import async_session
-from app.models import ParsedMessage
-from app.bot_instance import bot
+from app.database import ParsedMessage
+from app.main import bot
 
 
-logger = logging.getLogger(name)
+logger = logging.getLogger()
 
 
 async def handle_channel_message(message: MessageCreated):
