@@ -37,8 +37,3 @@ app = FastAPI(lifespan=webhook.lifespan)
 
 # Подключаем вебхук к приложению
 webhook.setup(app, path="/webhook")
-
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "bot": "t277_hakaton_max_bot"}

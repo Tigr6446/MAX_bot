@@ -20,8 +20,6 @@ class Settings(BaseSettings):
         url = self.database_url
         if url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        elif url.startswith("postgres://"):
-            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
         return url
 
 

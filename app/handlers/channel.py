@@ -14,6 +14,7 @@ from app.database import ParsedMessage, async_session
 
 logger = logging.getLogger(__name__)
 
+#делегирование на агент-клиента
 
 async def handle_channel_message(event: MessageCreated) -> None:
     # 0. Логируем ВСЁ, что долетает (на время отладки)
@@ -39,7 +40,7 @@ async def handle_channel_message(event: MessageCreated) -> None:
         else "❓ Категория: не определена"
     )
 
-    # 4. Пересылаем админу
+    # 4. Пересылаем админу ------ переделать
     try:
         await bot.send_message(
             chat_id=settings.my_user_id,
@@ -50,6 +51,7 @@ async def handle_channel_message(event: MessageCreated) -> None:
             ),
         )
         logger.info("Сообщение переслано админу. Категория: %s", category)
+
     except Exception as e:
         logger.exception("Не удалось переслать: %s", e)
 
@@ -64,5 +66,6 @@ async def handle_channel_message(event: MessageCreated) -> None:
                 ))
                 await session.commit()
             logger.info("Запись сохранена в БД: %s", category)
+
         except Exception as e:
             logger.exception("Ошибка сохранения в БД: %s", e)

@@ -34,13 +34,9 @@ class ParsedMessage(Base):
 
     __tablename__ = "parsed_message"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    channel_id: Mapped[str] = mapped_column(String(100))
+    id: Mapped[int] = mapped_column(primary_key=True) #переслать сообщение!!!!!!!
     message_text: Mapped[str] = mapped_column(String(6000))
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
 
 
 async def init_db() -> None:
