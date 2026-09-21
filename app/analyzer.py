@@ -5,6 +5,7 @@
 
 import logging
 import re
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -76,38 +77,51 @@ class HeuristicAnalyzer:
             },
         }
 
+        self._clean_regex = re.compile(r'[^\w\s]', re.UNICODE)
+        self._compiled_patterns = []
+
+        for category, keywords in self.raw_categories.items():
+            for keyword, weight in keywords.items():
+                pattern = re.compile(rf'\b{re.escape(keyword)}\w*', re.UNICODE)
+                self._compiled_patterns.append((pattern, category, weight))
+
     def _clean(self, text: str) -> str:
-        """Приводит к нижнему регистру и убирает пунктуацию."""
+        """Приводит текст к нижнему регистру и заменяет пунктуацию на пробелы"""
         if not text:
             return ""
-        text = text.lower()
-        text = re.sub(r"[^\w\s]", "", text)
-        return text
+        return self._clean_regex.sub(' ', text.lower())
 
-    def analyze(self, text: str | None) -> str | None:
-        """Возвращает название категории или None."""
-        if not text:
-            return None
-
+    def analyze(self, text: str) -> str | None:
+        """Возвращает название категории или None, если ничего не найдено"""
         cleaned = self._clean(text)
         if not cleaned:
             return None
 
-        scores = {cat: 0 for cat in self.categories}
-        for category, keywords in self.categories.items():
-            for keyword, weight in keywords.items():
-                pattern = rf"\b{re.escape(keyword)}\w*"
-                if re.search(pattern, cleaned):
-                    scores[category] += weight
+        scores = {catg: 0 for catg in self.raw_categories}
+
+        for pattern, category, weight in self._compiled_patterns:
+            if pattern.search(cleaned):
+                scores[category] += weight
 
         best = max(scores, key=scores.get)
+
         if scores[best] > 0:
             logger.debug(
                 "Категория '%s' набрала %d баллов. Все счёты: %s",
-                best, scores[best], scores,
+                best, scores[best], scores
             )
             return best
+
         return None
 
-
 analyzer = HeuristicAnalyzer()
+
+
+async def analyze_message_async(text: str) -> str | None:
+    """
+    Асинхронная обертка. Выполняет синхронный метод analyze в пул потоков,
+    гарантируя, что при одновременном приходе сообщений из разных каналов 
+    главный цикл async loop не будет заблокирован микрофризами.
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, analyzer.analyze, text)
