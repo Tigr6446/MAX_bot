@@ -7,7 +7,7 @@ from maxapi.webhook.fastapi import FastAPIMaxWebhook
 
 from app.bot_instance import bot
 from app.config import settings
-from app.database import init_db
+from app.database.model_1 import init_db
 from app.handlers.channel import handle_channel_message
 from app.handlers.start import cmd_start
 
