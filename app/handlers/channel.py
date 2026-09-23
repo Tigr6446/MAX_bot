@@ -40,7 +40,7 @@ async def handle_channel_message(event: MessageCreated) -> None:
         else "❓ Категория: не определена"
     )
 
-    # 5. Сохраняем в БД (только если категория определена)
+    # 4. Сохраняем в БД (только если категория определена)
     if category:
         try:
             async with async_session() as session:
