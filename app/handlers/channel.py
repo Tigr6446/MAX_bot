@@ -40,27 +40,11 @@ async def handle_channel_message(event: MessageCreated) -> None:
         else "❓ Категория: не определена"
     )
 
-    # 4. Пересылаем админу ------ переделать
-    try:
-        await bot.send_message(
-            chat_id=settings.my_user_id,
-            text=(
-                f"📩 Новое сообщение в канале\n\n"
-                f"{text or '[медиа без текста]'}\n\n"
-                f"{category_label}"
-            ),
-        )
-        logger.info("Сообщение переслано админу. Категория: %s", category)
-
-    except Exception as e:
-        logger.exception("Не удалось переслать: %s", e)
-
     # 5. Сохраняем в БД (только если категория определена)
     if category:
         try:
             async with async_session() as session:
                 session.add(ParsedMessage(
-                    channel_id=current_chat_id,
                     message_text=text or "[медиа без текста]",
                     category=category,
                 ))

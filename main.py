@@ -15,8 +15,8 @@ from app.handlers.start import cmd_start
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    yield
-
+    async with webhook.lifespan(app):
+        yield
 
 dp = Dispatcher()
 router = Router()
@@ -33,7 +33,7 @@ webhook = FastAPIMaxWebhook(
     secret=settings.webhook_secret,
 )
 
-app = FastAPI(lifespan=webhook.lifespan)
+app = FastAPI(lifespan=lifespan)
 
 # Подключаем вебхук к приложению
 webhook.setup(app, path="/webhook")
