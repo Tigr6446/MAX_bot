@@ -12,7 +12,6 @@ class Settings(BaseSettings):
     webhook_secret: str = "change_me"
     public_url: str = "http://localhost:8000"       
     database_url: str                               #ссылка на БД
-    parser_phone: str                               # номер аккаунта для парсинга
     parser_channels: str                            # список chat_id через запятую: "123,456"
 
     @property

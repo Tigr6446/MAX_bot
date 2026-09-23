@@ -4,9 +4,16 @@
 и сохраняет в БД. После работы объект самоудаляется.
 """
 
+import asyncio
 import logging
 
-from pymax import Client
+from pymax import (
+    ConsoleQrHandler,
+    ExtraConfig,
+    QrAuthFlow,
+    SyncOverrides,
+    WebClient,
+)
 
 from app.analyzer import analyzer
 from app.database.model_1 import ParsedMessage, async_session
@@ -19,78 +26,89 @@ class ChannelParser:
     Парсер каналов MAX.
 
     Жизненный цикл:
-        parser = ChannelParser(phone="+79990000000")
-        await parser.run(channels=[123456789, 987654321])
+        parser = ChannelParser()
+        await parser.run(channels=[-79132920662146])
         # объект дальше не нужен — уйдёт в GC
     """
 
-    def __init__(self, phone: str, work_dir: str = "cache"):
-        # Номер телефона аккаунта, от которого парсим
-        self.phone = phone
+    def __init__(self, work_dir: str = "cache"):
         # Папка, где PyMax хранит сессию (SQLite)
         self.work_dir = work_dir
-        # Клиент PyMax. Сессия сохранится в parser.db —
-        # при повторных запусках SMS-код уже не спросит
-        self.client = Client(
-            phone=phone,
+
+        # QR-авторизация через консоль.
+        # Если сессия уже сохранена — QR не понадобится.
+        flow = QrAuthFlow(ConsoleQrHandler())
+
+        # WebClient с принудительным полным sync чатов.
+        # Без SyncOverrides(chats_sync=-1) PyMax вернёт chats=0.
+        self.client = WebClient(
+            auth_flow=flow,
             work_dir=work_dir,
-            session_name="parser.db",
+            session_name="web.db",
+            extra_config=ExtraConfig(
+                sync=SyncOverrides(chats_sync=-1),
+            ),
         )
 
-    async def run(self, channels: list[int], limit: int = 50) -> None:
+    async def run(self, channels: list[int], limit: int = 10) -> None:
         """
         Полный цикл парсера: логин → парсинг → анализ → БД → закрытие.
 
         channels — список chat_id каналов (числа).
         limit — сколько последних постов тянуть из каждого канала.
         """
+        # PyMax.start() не возвращает управление — он живёт в фоне,
+        # слушая события. Поэтому запускаем его как отдельную задачу.
+        start_task = asyncio.create_task(self.client.start())
 
-        # Подключаемся к MAX под пользователем.
-        # При первом запуске PyMax попросит SMS-код в консоль.
-        await self.client.start()
+        # Даём клиенту подключиться и залогиниться
+        await asyncio.sleep(5)
 
         saved_total = 0
 
-        # Идём по каждому каналу по очереди
-        for chat_id in channels:
+        # Идём по каналам по очереди
+        for i, chat_id in enumerate(channels):
             try:
-                # Получаем историю канала (limit последних постов)
+                # Тянем историю канала
                 history = await self.client.fetch_history(
                     chat_id=chat_id,
                     backward=limit,
                 )
             except Exception as e:
-                # Если канал недоступен — логируем и идём к следующему
                 logger.exception("Ошибка парсинга канала %s: %s", chat_id, e)
                 continue
 
-            # Открываем сессию БД один раз на канал
+            # Открываем сессию БД на канал
             async with async_session() as session:
                 for msg in history:
-                    # Пропускаем посты без текста (медиа, стикеры и т.п.)
+                    # Пропускаем посты без текста
                     if not msg.text:
                         continue
 
-                    # Прогоняем текст через эвристический анализатор.
-                    # Если категория не определена — пост не сохраняем.
+                    # Прогоняем через эвристический анализатор
                     category = analyzer.analyze(msg.text)
                     if not category:
                         continue
 
-                    # Сохраняем пост в БД
+                    # Сохраняем в БД
                     session.add(ParsedMessage(
+                        channel_id=str(chat_id),
                         message_text=msg.text,
                         category=category,
                     ))
                     saved_total += 1
 
-                # Фиксируем все вставки по каналу
                 await session.commit()
 
             logger.info("Канал %s обработан", chat_id)
 
+            # Пауза между каналами (кроме последнего),
+            # чтобы не долбить API MAX
+            if i < len(channels) - 1:
+                await asyncio.sleep(2)
+
         logger.info("Всего сохранено записей: %d", saved_total)
 
-        # Закрываем соединение, чтобы освободить ресурсы.
-        # После этого объект можно смело удалять.
+        # Останавливаем клиент и подчищаем фоновую задачу
         await self.client.stop()
+        start_task.cancel()
