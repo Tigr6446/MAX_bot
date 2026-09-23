@@ -4,13 +4,12 @@ from fastapi import FastAPI
 from maxapi import Dispatcher, Router
 from maxapi.filters.command import Command
 from maxapi.webhook.fastapi import FastAPIMaxWebhook
+from maxapi import Bot
 
-from app.bot_instance import bot
 from app.config import settings
 from app.database.model_1 import init_db
 from app.handlers.channel import handle_channel_message
 from app.handlers.start import cmd_start
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +19,7 @@ async def lifespan(app: FastAPI):
 
 dp = Dispatcher()
 router = Router()
+bot = Bot(settings.max_bot_token)
 
 router.message_created(Command("start"))(cmd_start)
 router.message_created()(handle_channel_message)

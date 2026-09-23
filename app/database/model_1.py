@@ -12,7 +12,7 @@ from app.config import settings
 
 
 class Base(DeclarativeBase):
-    """Базовый класс для всех моделей."""
+    #Базовый класс для всех моделей.
     pass
 
 
@@ -30,7 +30,7 @@ async_session = async_sessionmaker(
 
 
 class ParsedMessage(Base):
-    """Сохранённое сообщение из канала с определённой категорией."""
+    #Сохранённое сообщение из канала с определённой категорией.
 
     __tablename__ = "parsed_message"
 
@@ -40,6 +40,6 @@ class ParsedMessage(Base):
 
 
 async def init_db() -> None:
-    """Создаёт таблицы при старте приложения."""
+    #Создаёт таблицы при старте приложения.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

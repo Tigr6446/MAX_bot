@@ -77,7 +77,7 @@ class HeuristicAnalyzer:
         }
 
     def _clean(self, text: str) -> str:
-        """Приводит к нижнему регистру и убирает пунктуацию."""
+        #Приводит к нижнему регистру и убирает пунктуацию.
         if not text:
             return ""
         text = text.lower()
@@ -85,7 +85,7 @@ class HeuristicAnalyzer:
         return text
 
     def analyze(self, text: str | None) -> str | None:
-        """Возвращает название категории или None."""
+        #Возвращает название категории или None.
         if not text:
             return None
 

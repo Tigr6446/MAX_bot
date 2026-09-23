@@ -8,7 +8,6 @@ import logging
 from maxapi.types import MessageCreated
 
 from app.analyzer import analyzer
-from app.bot_instance import bot
 from app.config import settings
 from app.database.model_1 import ParsedMessage, async_session
 
