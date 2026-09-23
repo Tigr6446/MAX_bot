@@ -92,7 +92,6 @@ class ChannelParser:
 
                     # Сохраняем в БД
                     session.add(ParsedMessage(
-                        channel_id=str(chat_id),
                         message_text=msg.text,
                         category=category,
                     ))
