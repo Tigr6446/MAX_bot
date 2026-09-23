@@ -10,9 +10,10 @@ class Settings(BaseSettings):
 
     max_bot_token: str
     webhook_secret: str = "change_me"
-    public_url: str = "http://localhost:8000"
-    database_url: str
-    target_channel_id: str 
+    public_url: str = "http://localhost:8000"       
+    database_url: str                               #ссылка на БД
+    parser_phone: str                               # номер аккаунта для парсинга
+    parser_channels: str                            # список chat_id через запятую: "123,456"
 
     @property
     def async_database_url(self) -> str:

@@ -8,7 +8,7 @@ from maxapi import Bot
 
 from app.config import settings
 from app.database.model_1 import init_db
-from app.handlers.channels.channel import handle_channel_message
+from app.handlers.channels.channel_parser import handle_channel_message
 from app.handlers.start import cmd_start
 
 @asynccontextmanager
