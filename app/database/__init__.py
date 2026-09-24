@@ -5,7 +5,6 @@ from app.database.model_1 import (
     async_session,
     ParsedMessage,
     init_db,
-    get_session,
 )
 
 __all__ = [
@@ -14,5 +13,4 @@ __all__ = [
     "async_session",
     "ParsedMessage",
     "init_db",
-    "get_session",
 ]
