@@ -16,6 +16,12 @@ class Base(DeclarativeBase):
     pass
 
 
+import os
+url = os.environ.get("DATABASE_URL", "NOT SET")
+safe = url.split("@")[-1] if "@" in url else url
+print(f">>> DB HOST: {safe}", flush=True)
+print(f">>> DB URL LENGTH: {len(url)}", flush=True)
+
 engine = create_async_engine(
     settings.async_database_url,
     echo=False,
