@@ -16,7 +16,7 @@ from pymax import (
 )
 from sqlalchemy import select
 
-from app.handlers.Analyzer.analyzer import analyzer
+from app.Analyzer.analyzer import analyzer
 from app.database.model_1 import ParsedMessage, async_session
 
 logger = logging.getLogger(__name__)
