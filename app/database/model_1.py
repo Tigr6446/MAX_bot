@@ -12,15 +12,9 @@ from app.config import settings
 
 
 class Base(DeclarativeBase):
-    #Базовый класс для всех моделей.
+    """Базовый класс для всех моделей."""
     pass
 
-
-import os
-url = os.environ.get("DATABASE_URL", "NOT SET")
-safe = url.split("@")[-1] if "@" in url else url
-print(f">>> DB HOST: {safe}", flush=True)
-print(f">>> DB URL LENGTH: {len(url)}", flush=True)
 
 engine = create_async_engine(
     settings.async_database_url,
@@ -36,16 +30,24 @@ async_session = async_sessionmaker(
 
 
 class ParsedMessage(Base):
-    #Сохранённое сообщение из канала с определённой категорией.
+    """Сохранённое сообщение из канала с определённой категорией."""
 
     __tablename__ = "parsed_message"
 
-    id: Mapped[int] = mapped_column(primary_key=True) #переслать сообщение!!!!!!!
+    id: Mapped[int] = mapped_column(primary_key=True)
+    message_id: Mapped[str] = mapped_column(
+        String(100), unique=True, index=True
+    )
     message_text: Mapped[str] = mapped_column(String(6000))
-    category: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    category: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
 
 
 async def init_db() -> None:
-    #Создаёт таблицы при старте приложения.
+    """Создаёт таблицы при старте приложения."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

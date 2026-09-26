@@ -14,6 +14,7 @@ from pymax import (
     SyncOverrides,
     WebClient,
 )
+from sqlalchemy import select
 
 from app.analyzer import analyzer
 from app.database.model_1 import ParsedMessage, async_session
@@ -65,6 +66,7 @@ class ChannelParser:
         await asyncio.sleep(5)
 
         saved_total = 0
+        skipped_total = 0
 
         # Идём по каналам по очереди
         for i, chat_id in enumerate(channels):
@@ -90,8 +92,20 @@ class ChannelParser:
                     if not category:
                         continue
 
-                    # Сохраняем в БД
+                    # --- ДЕДУПЛИКАЦИЯ ---
+                    # Проверяем, есть ли уже запись с таким message_id
+                    existing = await session.execute(
+                        select(ParsedMessage).where(
+                            ParsedMessage.message_id == str(msg.id)
+                        )
+                    )
+                    if existing.scalar_one_or_none():
+                        skipped_total += 1
+                        continue
+
+                    # --- СОХРАНЕНИЕ ---
                     session.add(ParsedMessage(
+                        message_id=str(msg.id),
                         message_text=msg.text,
                         category=category,
                     ))
@@ -106,7 +120,10 @@ class ChannelParser:
             if i < len(channels) - 1:
                 await asyncio.sleep(2)
 
-        logger.info("Всего сохранено записей: %d", saved_total)
+        logger.info(
+            "Итого: сохранено %d, пропущено дубликатов %d",
+            saved_total, skipped_total,
+        )
 
         # Останавливаем клиент и подчищаем фоновую задачу
         await self.client.stop()

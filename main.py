@@ -8,7 +8,7 @@ from maxapi import Bot
 
 from app.config import settings
 from app.database.model_1 import init_db
-from app.handlers.user_command_TEST import handle_user_command
+from app.handlers.CommandsUser import handle_user_command
 from app.handlers.start import cmd_start
 
 @asynccontextmanager
