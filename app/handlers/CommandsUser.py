@@ -5,7 +5,7 @@
 import logging
 from typing import Optional
 from maxapi.types import MessageCreated
-from app.analyzer import analyzer
+from app.Analyzer.analyzer import analyzer
 from app.database.requests import get_upcoming_events
 
 logger = logging.getLogger(__name__)
