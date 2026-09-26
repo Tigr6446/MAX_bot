@@ -42,10 +42,21 @@ class ParsedMessage(Base):
     category: Mapped[str | None] = mapped_column(
         String(50), nullable=True
     )
+
+    # Поля под код НИКИТЫ (пока не заполняются парсером)
+    title: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
+    event_date: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+    url: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )
-
 
 async def init_db() -> None:
     """Создаёт таблицы при старте приложения."""

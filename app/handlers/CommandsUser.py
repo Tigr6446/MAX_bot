@@ -25,7 +25,7 @@ async def handle_user_command(event: MessageCreated) -> None:
         return
 
     #ID пользователя
-    user_id = event.message.from_user.id if event.message.from_user else event.recipient.id
+    user_id = event.from_user.user_id
     normalized = text.strip().lower()
 
     #Проверка на согласие продолжить просмотр ("Да")
