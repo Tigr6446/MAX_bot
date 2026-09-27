@@ -28,7 +28,8 @@ async def get_user_profile(user_id: int) -> User | None:
 
 
 async def check_settings_intent(event: MessageCreated, context: MemoryContext) -> bool:
-    text = event.message.body.text.strip().lower() if event.message.body else ""
+    text = event.message.body.text if event.message.body and event.message.body.text else ""
+    text = text.strip().lower()
     action_pattern = r"(измени|поменя|смени|обнови|друг)"
     
     #Проверка желания сменить регион

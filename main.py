@@ -36,18 +36,18 @@ async def lifespan(app: FastAPI):
         yield
 
 
-dp = Dispatcher()  # storage=MemoryContext по умолчанию
+dp = Dispatcher()
 router = Router()
 bot = Bot(settings.max_bot_token)
 
-# Онбординг
+# --- Онбординг ---
 router.bot_started()(cmd_start)
 router.message_created(Command("start"))(cmd_start)
 router.message_created(StateFilter(Onboarding.waiting_for_region))(process_region)
 router.message_created(StateFilter(Onboarding.waiting_for_city))(process_city)
 router.message_created(StateFilter(Onboarding.waiting_for_categories))(process_categories)
 
-# Настройка профиля
+# --- Настройки ---
 router.message_created(Command("settings"))(cmd_settings)
 router.message_created(Command("setting"))(cmd_settings)
 router.message_created(StateFilter(SettingsStates.waiting_for_action))(process_settings_action)
@@ -57,16 +57,16 @@ router.message_created(StateFilter(SettingsStates.confirm_city_change))(confirm_
 router.message_created(StateFilter(SettingsStates.changing_categories))(save_new_categories)
 
 
-@router.message_created()
+# --- Обёртка для обычных команд ---
 async def pre_user_command(event, context):
-    # Сначала проверяем намерение сменить настройки
+    """Проверяет настройки, иначе — обычные команды."""
     is_settings_intent = await check_settings_intent(event, context)
-    
     if is_settings_intent:
         return
-
-    # Обычные команды — последними
     await handle_user_command(event)
+
+
+router.message_created()(pre_user_command)
 
 dp.include_routers(router)
 
