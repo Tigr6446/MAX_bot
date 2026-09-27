@@ -45,7 +45,7 @@ async def _get_all_chat_ids() -> list[int]:
 
 
 async def _notify_users(bot, events: list[ParsedMessage]) -> None:
-    """Рассылает новые мероприятия всем пользователям."""
+    """Рассылает новые мероприятия, сгруппированные по категориям."""
     chat_ids = await _get_all_chat_ids()
     if not chat_ids:
         logger.warning("Нет пользователей для рассылки")
@@ -61,18 +61,29 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
         "pushkin_card": "Пушкинская карта",
     }
 
+    # 1. Группируем события по категориям
+    grouped: dict[str, list[ParsedMessage]] = {}
     for event in events:
-        cat_label = CATEGORY_TITLES.get(event.category or "", "Мероприятие")
-        text_preview = event.message_text[:300]
-        if len(event.message_text) > 300:
-            text_preview += "..."
+        cat_key = event.category or "other"
+        grouped.setdefault(cat_key, []).append(event)
 
-        message_text = (
-            f"🔔 Новое мероприятие!\n\n"
-            f"🎯 {cat_label}\n\n"
-            f"{text_preview}"
-        )
+    # 2. Для каждой категории формируем одно сообщение
+    for cat_key, cat_events in grouped.items():
+        cat_label = CATEGORY_TITLES.get(cat_key, "Без категории")
 
+        # Заголовок
+        lines = [f"🔔 Новые мероприятия: {cat_label}\n"]
+
+        # Мероприятия
+        for i, event in enumerate(cat_events, start=1):
+            text_preview = event.message_text[:300]
+            if len(event.message_text) > 300:
+                text_preview += "..."
+            lines.append(f"{i}. {text_preview}")
+
+        message_text = "\n\n".join(lines)
+
+        # 3. Отправляем каждому пользователю
         for chat_id in chat_ids:
             try:
                 await bot.send_message(
@@ -85,7 +96,6 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
                     "Не удалось отправить уведомление chat_id=%s: %s",
                     chat_id, e,
                 )
-
 
 async def parser_loop(bot) -> None:
     """
