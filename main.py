@@ -1,3 +1,5 @@
+import asyncio
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -28,12 +30,21 @@ from app.handlers.Settings import (
     save_new_categories,
 )
 
+from app.background.notifier import parser_loop
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    
+    # Запускаем фоновую задачу парсера
+    parser_task = asyncio.create_task(parser_loop(bot))
+    
     async with webhook.lifespan(app):
         yield
+    
+    # При завершении — отменяем задачу
+    parser_task.cancel()
 
 
 dp = Dispatcher()
