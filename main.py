@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
 from maxapi import Dispatcher, Router, Bot
 from maxapi.filters.command import Command
 from maxapi.filters.state import StateFilter

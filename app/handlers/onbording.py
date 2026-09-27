@@ -9,7 +9,9 @@ import logging
 
 from maxapi.context import MemoryContext, State, StatesGroup
 from maxapi.types import BotStarted, MessageCreated
+
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import select
 
 from app.Analyzer.analyzer import analyzer
 from app.database.model_3 import AsyncSessionLocal, User
@@ -24,33 +26,50 @@ class Onboarding(StatesGroup):
     waiting_for_categories = State()
 
 
+async def _user_exists(user_id: int) -> bool:
+    """Проверяет, зарегистрирован ли пользователь в БД."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(User).where(User.id == user_id)
+        )
+        return result.scalar_one_or_none() is not None
+
+
 async def cmd_start(event, context: MemoryContext) -> None:
     """
     Старт онбординга.
-    Работает и для /start, и для кнопки «Начать» (BotStarted).
+    Работает и для /start, и для кнопки «Начать».
+    Если пользователь уже зарегистрирован — просто приветствует.
     """
-    await context.set_state(Onboarding.waiting_for_region)
-
+    # Достаём user_id и имя из разных типов событий
     if isinstance(event, BotStarted):
-        # Кнопка «Начать» — нет event.message
-        await event.bot.send_message(
-            chat_id=event.chat_id,
-            text=(
-                "Привет! 👋\n\n"
-                "Я помогу подбирать для тебя ивенты. "
-                "Давай настроим профиль.\n\n"
-                "📍 Напиши свой регион (например: Московская область):"
-            ),
+        user_id = event.user.user_id
+        first_name = event.user.first_name or "друг"
+        answer = lambda text: event.bot.send_message(
+            chat_id=event.chat_id, text=text
         )
     else:
-        # Команда /start — есть event.message
-        await event.message.answer(
-            f"Привет, {event.from_user.first_name}! 👋\n\n"
-            "Я помогу подбирать для тебя ивенты. "
-            "Давай настроим профиль.\n\n"
-            "📍 Напиши свой регион (например: Московская область):"
-        )
+        user_id = event.from_user.user_id
+        first_name = event.from_user.first_name or "друг"
+        answer = event.message.answer
 
+    # Проверяем, есть ли пользователь в БД
+    if await _user_exists(user_id):
+        await answer(
+            f"С возвращением, {first_name}! 👋\n\n"
+            "Можешь написать категорию (например, «Спорт») "
+            "или «Все мероприятия», чтобы найти ивенты."
+        )
+        return
+
+    # Новый пользователь — запускаем онбординг
+    await context.set_state(Onboarding.waiting_for_region)
+    await answer(
+        f"Привет, {first_name}! 👋\n\n"
+        "Я помогу подбирать для тебя ивенты. "
+        "Давай настроим профиль.\n\n"
+        "📍 Напиши свой регион (например: Московская область):"
+    )
 
 async def process_region(event: MessageCreated, context: MemoryContext) -> None:
     """
