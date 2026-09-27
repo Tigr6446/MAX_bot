@@ -51,7 +51,7 @@ class ChannelParser:
             ),
         )
 
-    async def run(self, channels: list[int], limit: int = 25) -> None:
+    async def run(self, channels: list[int], limit: int = 15) -> None:
         """
         Полный цикл парсера: логин → парсинг → анализ → БД → закрытие.
 

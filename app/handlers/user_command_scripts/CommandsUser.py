@@ -156,7 +156,7 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
 
                 if channels:
                     parser = ChannelParser()
-                    await parser.run(channels=channels, limit=25)
+                    await parser.run(channels=channels, limit=15)
                     del parser
                     logger.info("Парсер запущен для пользователя %s", user_id)
             except Exception as e:
