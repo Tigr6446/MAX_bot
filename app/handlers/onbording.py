@@ -55,6 +55,7 @@ async def cmd_start(event, context: MemoryContext) -> None:
 
     # Проверяем, есть ли пользователь в БД
     if await _user_exists(user_id):
+        await context.clear()
         await answer(
             f"С возвращением, {first_name}! 👋\n\n"
             "Можешь написать категорию (например, «Спорт») "
