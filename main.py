@@ -19,7 +19,7 @@ from app.handlers.user_command_scripts.onbording import (
     process_city,
     process_categories,
 )
-from app.handlers.user_command_scripts.Settings import (
+from app.handlers.Settings import (
     SettingsStates,
     cmd_settings,
     check_settings_intent,
