@@ -136,7 +136,7 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
 
             if channels:
                 parser = ChannelParser()
-                await parser.run(channels=channels, limit=10)
+                await parser.run(channels=channels, limit=25)
                 del parser
                 logger.info("Парсер запущен для пользователя %s", user_id)
         except Exception as e:
@@ -202,5 +202,11 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
             counter += 1
             await asyncio.sleep(0.3)
 
-    # Спрашиваем про следующую страницу
-    await event.message.answer("Нужны ли ещё мероприятия? (Да / Нет)")
+    # Спрашиваем про следующую страницу только если набралось PAGE_SIZE
+    if len(events) < PAGE_SIZE:
+        # Больше нет — не спрашиваем
+        user_sessions.pop(user_id, None)
+        await event.message.answer("Это все мероприятия по данному запросу.")
+    else:
+        # Возможно, есть ещё — спрашиваем
+        await event.message.answer("Нужны ли ещё мероприятия? (Да / Нет)")
