@@ -74,12 +74,9 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
         # Заголовок
         lines = [f"🔔 Новые мероприятия: {cat_label}\n"]
 
-        # Мероприятия
+                # Мероприятия
         for i, event in enumerate(cat_events, start=1):
-            text_preview = event.message_text[:300]
-            if len(event.message_text) > 300:
-                text_preview += "..."
-            lines.append(f"{i}. {text_preview}")
+            lines.append(f"{i}. {event.message_text}")
 
         message_text = "\n\n".join(lines)
 
