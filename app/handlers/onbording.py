@@ -63,7 +63,7 @@ async def cmd_start(event, context: MemoryContext) -> None:
         )
         return
 
-    # Новый пользователь — запускаем онбординг
+    # Новый пользователь - запускаем онбординг
     await context.set_state(Onboarding.waiting_for_region)
     await answer(
         f"Привет, {first_name}! 👋\n\n"
