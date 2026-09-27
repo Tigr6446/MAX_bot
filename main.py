@@ -30,6 +30,7 @@ router = Router()
 bot = Bot(settings.max_bot_token)
 
 # Онбординг
+router.bot_started()(cmd_start)
 router.message_created(Command("start"))(cmd_start)
 router.message_created(StateFilter(Onboarding.waiting_for_region))(process_region)
 router.message_created(StateFilter(Onboarding.waiting_for_city))(process_city)

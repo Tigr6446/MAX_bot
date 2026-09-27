@@ -5,6 +5,7 @@
 
 import logging
 
+from maxapi.types import BotStarted
 from maxapi.context import MemoryContext, State, StatesGroup
 from maxapi.types import MessageCreated
 from sqlalchemy.dialects.postgresql import insert
@@ -22,15 +23,28 @@ class Onboarding(StatesGroup):
     waiting_for_categories = State()
 
 
-async def cmd_start(event: MessageCreated, context: MemoryContext) -> None:
-    """Старт онбординга: спрашиваем регион."""
+async def cmd_start(event, context: MemoryContext) -> None:
+    """Старт онбординга: работает и для /start, и для кнопки «Начать»."""
     await context.set_state(Onboarding.waiting_for_region)
-    await event.message.answer(
-        f"Привет, {event.from_user.first_name}! 👋\n\n"
-        "Я помогу подбирать для тебя ивенты. "
-        "Давай настроим профиль.\n\n"
-        "📍 Напиши свой регион (например: Московская область):"
-    )
+
+    # Определяем, откуда пришло событие
+    if isinstance(event, BotStarted):
+        # Кнопка «Начать» — нет event.message
+        await event.bot.send_message(
+            chat_id=event.chat_id,
+            text=(
+                f"Привет! 👋\n\n"
+                "Я помогу подбирать для тебя ивенты. "
+                "Давай настроим профиль.\n\n"
+                "📍 Напиши свой регион (например: Московская область):"
+            ),
+        )
+    else:
+        # Команда /start — есть event.message
+        await event.message.answer(
+            f"Привет, {event.from_user.first_name}! 👋\n\n"
+            "📍 Напиши свой регион (например: Московская область):"
+        )
 
 
 async def process_region(event: MessageCreated, context: MemoryContext) -> None:
@@ -56,7 +70,7 @@ async def process_city(event: MessageCreated, context: MemoryContext) -> None:
     await context.set_state(Onboarding.waiting_for_categories)
     await event.message.answer(
         "Отлично! Последний шаг 🎯\n"
-        "Напиши категории через запятую:\n\n"
+        "Напиши категории, кторые тебя интересуют через запятую (или выбери что-то одно):\n\n"
         "Например: волонтёрство, наука, культура, тренинги"
     )
 
@@ -108,7 +122,7 @@ async def process_categories(event: MessageCreated, context: MemoryContext) -> N
         f"📍 Регион: {data.get('region')}\n"
         f"🏙 Город: {data.get('city')}\n"
         f"🎯 Интересы: {categories_str}\n\n"
-        "Теперь я буду присылать события для тебя!"
+        "Теперь я буду помогать тебе с поиском мероприятий!"
     )
 
     await context.clear()
