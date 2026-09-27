@@ -3,6 +3,7 @@
 Бот работает ТОЛЬКО в личных сообщениях.
 """
 import logging
+import asyncio
 from typing import Optional
 from maxapi.types import MessageCreated
 from app.Analyzer.analyzer import analyzer
@@ -107,32 +108,78 @@ async def handle_user_command(event: MessageCreated) -> None:
 async def _send_next_page(event: MessageCreated, user_id: int, session: dict) -> None:
     """
     Вспомогательная функция: делаем запрос в БД и формируем ответ.
+    Если в БД пусто — запускаем парсер и пробуем снова.
     """
     category = session["category"]
     offset = session["offset"]
     title = session["title"]
 
-    #Запрос в БД с учётом offset
-    events = await get_upcoming_events(category=category, limit=PAGE_SIZE, offset=offset)
+    # Первый запрос в БД
+    events = await get_upcoming_events(
+        category=category, limit=PAGE_SIZE, offset=offset
+    )
 
+    # Если пусто и это первая страница — запускаем парсер
+    if not events and offset == 0:
+        await event.message.answer(
+            "⏳ Подождите немного, ищу мероприятия..."
+        )
+
+        # Запускаем парсер
+        try:
+            from app.handlers.channels import ChannelParser
+            from app.config import settings
+
+            channels = [
+                int(x.strip())
+                for x in settings.parser_channels.split(",")
+                if x.strip()
+            ]
+
+            if channels:
+                parser = ChannelParser()
+                await parser.run(channels=channels, limit=10)
+                del parser
+                logger.info("Парсер запущен для пользователя %s", user_id)
+        except Exception as e:
+            logger.exception("Ошибка парсера: %s", e)
+            await event.message.answer(
+                f"❌ Не удалось запустить парсер: {type(e).__name__}"
+            )
+            user_sessions.pop(user_id, None)
+            return
+
+        # Повторный запрос в БД после парсинга
+        events = await get_upcoming_events(
+            category=category, limit=PAGE_SIZE, offset=offset
+        )
+
+    # Если и после парсинга пусто
     if not events:
         if offset == 0:
-            await event.message.answer(f"<b>{title}</b>\n\nК сожалению, ничего не найдено.")
+            await event.message.answer(
+                f"😔 По запросу «{title}» ничего не найдено."
+            )
         else:
             await event.message.answer("Больше мероприятий по этому запросу нет")
-        
-        #Сбрасываем сессию, т.к. список закончился
+
         user_sessions.pop(user_id, None)
         return
 
-    response_lines = [f"<b>{title}</b>\n"]
-    for item in events:
-        date_str = item.event_date.strftime("%d.%m.%Y %H:%M")
-        line = f"• <b>{item.title}</b> — {date_str}"
-        if getattr(item, "url", None):
-            line += f"\n  Ссылка: {item.url}"
-        response_lines.append(line)
+    # Формируем сообщение с категорией
+    await event.message.answer(f"📌 {title}\n")
 
-    response_lines.append("\n<b>Нужны ли ещё мероприятия? (Да / Нет)</b>")
+    # Отправляем мероприятия по одному
+    for i, item in enumerate(events, start=offset + 1):
+        text_preview = item.message_text[:300]
+        if len(item.message_text) > 300:
+            text_preview += "..."
 
-    await event.message.answer("\n\n".join(response_lines))
+        cat_label = item.category or "без категории"
+        await event.message.answer(
+            f"{i}. [{cat_label}]\n\n{text_preview}"
+        )
+        await asyncio.sleep(0.3)  # пауза между сообщениями
+
+    # Спрашиваем про следующую страницу
+    await event.message.answer("Нужны ли ещё мероприятия? (Да / Нет)")
