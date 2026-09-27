@@ -58,7 +58,7 @@ class HeuristicAnalyzer:
             return ""
         return re.sub(r"[^\w\s]", "", text.lower())
 
-    def analyze_topic(self, text: Optional[str]) -> Optional[str]:
+    def analyze_topic(self, text: Optional[str], min_score: int = 5) -> Optional[str]:
         #Определение категории
         cleaned = self._clean(text)
         if not cleaned:
@@ -73,11 +73,16 @@ class HeuristicAnalyzer:
 
         #Возвращает категорию набрашую наибольшее кол-во балов
         best = max(scores, key=scores.get)
-        return best if scores[best] > 0 else None
 
-    def analyze(self, text: Optional[str]) -> Optional[str]:
+        #ЕСЛИ БАЛОВ МЕНЬШЕ ПОРОГА - ИГНОРИМ
+        if scores[best] < min_score:
+            return None
+
+        return best
+
+    def analyze(self, text: Optional[str], min_score: int = 5) -> Optional[str]:
         #Алиас для обратной совместимости
-        return self.analyze_topic(text)
+        return self.analyze_topic(text, min_score=min_score)
 
     def detect_location(self, text: Optional[str]) -> dict:
         #Поиск региона и города + проверка гео-конфликта
