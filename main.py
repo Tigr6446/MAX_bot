@@ -17,6 +17,16 @@ from app.handlers.onbording import (
     process_city,
     process_categories,
 )
+from app.handlers.Settings import (
+    SettingsStates,
+    cmd_settings,
+    check_settings_intent,
+    process_settings_action,
+    save_new_region,
+    save_new_city,
+    confirm_city_change_action,
+    save_new_categories,
+)
 
 
 @asynccontextmanager
@@ -37,8 +47,26 @@ router.message_created(StateFilter(Onboarding.waiting_for_region))(process_regio
 router.message_created(StateFilter(Onboarding.waiting_for_city))(process_city)
 router.message_created(StateFilter(Onboarding.waiting_for_categories))(process_categories)
 
-# Обычные команды — последними
-router.message_created()(handle_user_command)
+# Настройка профиля
+router.message_created(Command("settings"))(cmd_settings)
+router.message_created(Command("setting"))(cmd_settings)
+router.message_created(StateFilter(SettingsStates.waiting_for_action))(process_settings_action)
+router.message_created(StateFilter(SettingsStates.changing_region))(save_new_region)
+router.message_created(StateFilter(SettingsStates.changing_city))(save_new_city)
+router.message_created(StateFilter(SettingsStates.confirm_city_change))(confirm_city_change_action)
+router.message_created(StateFilter(SettingsStates.changing_categories))(save_new_categories)
+
+
+@router.message_created()
+async def pre_user_command(event, context):
+    # Сначала проверяем намерение сменить настройки
+    is_settings_intent = await check_settings_intent(event, context)
+    
+    if is_settings_intent:
+        return
+
+    # Обычные команды — последними
+    await handle_user_command(event)
 
 dp.include_routers(router)
 
