@@ -109,6 +109,7 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
     """
     Вспомогательная функция: делаем запрос в БД и формируем ответ.
     Если в БД пусто — запускаем парсер и пробуем снова.
+    Мероприятия группируются по категориям.
     """
     category = session["category"]
     offset = session["offset"]
@@ -121,11 +122,8 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
 
     # Если пусто и это первая страница — запускаем парсер
     if not events and offset == 0:
-        await event.message.answer(
-            "⏳ Подождите немного, ищу мероприятия..."
-        )
+        await event.message.answer("⏳ Подождите немного, ищу мероприятия...")
 
-        # Запускаем парсер
         try:
             from app.handlers.channels import ChannelParser
             from app.config import settings
@@ -157,29 +155,52 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
     # Если и после парсинга пусто
     if not events:
         if offset == 0:
-            await event.message.answer(
-                f"😔 По запросу «{title}» ничего не найдено."
-            )
+            await event.message.answer(f"😔 По запросу «{title}» ничего не найдено.")
         else:
             await event.message.answer("Больше мероприятий по этому запросу нет")
 
         user_sessions.pop(user_id, None)
         return
 
-    # Формируем сообщение с категорией
+    # Русские названия категорий
+    CATEGORY_TITLES = {
+        "volunteering": "Волонтёрство",
+        "forum": "Форумы и конференции",
+        "science": "Наука и образование",
+        "sport": "Спорт",
+        "culture": "Культура и искусство",
+        "workshop": "Мастер-классы и воркшопы",
+        "pushkin_card": "Пушкинская карта",
+    }
+
+    # Группируем мероприятия по категориям
+    grouped: dict[str, list] = {}
+    for item in events:
+        cat_key = item.category or "other"
+        grouped.setdefault(cat_key, []).append(item)
+
+    # Заголовок страницы
     await event.message.answer(f"📌 {title}\n")
 
-    # Отправляем мероприятия по одному
-    for i, item in enumerate(events, start=offset + 1):
-        text_preview = item.message_text[:300]
-        if len(item.message_text) > 300:
-            text_preview += "..."
+    # Идём по категориям
+    counter = offset + 1
+    for cat_key, items in grouped.items():
+        cat_label = CATEGORY_TITLES.get(cat_key, "Без категории")
 
-        cat_label = item.category or "без категории"
-        await event.message.answer(
-            f"{i}. [{cat_label}]\n\n{text_preview}"
-        )
-        await asyncio.sleep(0.3)  # пауза между сообщениями
+        # Подзаголовок категории
+        await event.message.answer(f"🎯 {cat_label}")
+
+        # Мероприятия этой категории
+        for item in items:
+            text_preview = item.message_text[:300]
+            if len(item.message_text) > 300:
+                text_preview += "..."
+
+            await event.message.answer(
+                f"{counter}. {text_preview}"
+            )
+            counter += 1
+            await asyncio.sleep(0.3)
 
     # Спрашиваем про следующую страницу
     await event.message.answer("Нужны ли ещё мероприятия? (Да / Нет)")
