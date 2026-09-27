@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -13,6 +14,56 @@ logger = logging.getLogger(__name__)
 #Путь к data.json
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATA_PATH = os.path.join(BASE_DIR, "data.json")
+
+def extract_event_date(text: Optional[str]) -> Optional[datetime]:
+    """
+    Экстрактор дат из текста. 
+    Поддерживает цифровые форматы (ДД.ММ, ДД.ММ.ГГГГ) 
+    и текстовые (15 октября, 25 мая 2026).
+    """
+    if not text:
+        return None
+        
+    current_year = datetime.now().year
+    
+    #Поиск числовых дат (например, 25.10.2026 или 25.10)
+    num_match = re.search(r'\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b', text)
+    if num_match:
+        day, month, year = num_match.groups()
+        try:
+            year = int(year) if year else current_year
+            if year < 100:
+                year += 2000
+            return datetime(year, int(month), int(day))
+        except ValueError:
+            pass # Если попалась некорректная дата, игнорируем
+
+    #Поиск текстовых дат (например, 15 октября 2026 или 5 мая)
+    months = {
+        "января": 1, "февраля": 2, "марта": 3, "апреля": 4,
+        "мая": 5, "июня": 6, "июля": 7, "августа": 8,
+        "сентября": 9, "октября": 10, "ноября": 11, "декабря": 12
+    }
+    
+    #Собираем все месяцы в одно регулярное выражение
+    month_pattern = "|".join(months.keys())
+    
+    #Ищет: число + месяц + (опционально слова "года/г.") + (опционально 4 цифры года)
+    text_match = re.search(
+        rf'(?i)\b(\d{{1,2}})\s+({month_pattern})(?:\s+(?:года|г\.|г)?\s*)?(\d{{4}})?\b', 
+        text
+    )
+    
+    if text_match:
+        day, month_word, year = text_match.groups()
+        month_num = months[month_word.lower()]
+        try:
+            year = int(year) if year else current_year
+            return datetime(year, month_num, int(day))
+        except ValueError:
+            pass
+
+    return None
 
 
 class HeuristicAnalyzer:
