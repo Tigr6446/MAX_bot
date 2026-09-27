@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional
 from maxapi.types import MessageCreated
 from app.Analyzer.analyzer import analyzer
-from app.database.requests import get_upcoming_events
+from app.database.requests import get_upcoming_events, count_all_events
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +108,8 @@ async def handle_user_command(event: MessageCreated) -> None:
 async def _send_next_page(event: MessageCreated, user_id: int, session: dict) -> None:
     """
     Вспомогательная функция: делаем запрос в БД и формируем ответ.
-    Если в БД пусто — запускаем парсер и пробуем снова.
-    Мероприятия группируются по категориям.
+    Если БД пуста — запускаем парсер и пробуем снова.
+    Если категория пуста, но БД не пуста — сообщаем об этом.
     """
     category = session["category"]
     offset = session["offset"]
@@ -120,42 +120,56 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
         category=category, limit=PAGE_SIZE, offset=offset
     )
 
-    # Если пусто и это первая страница — запускаем парсер
+    # Если пусто и это первая страница — решаем, что делать
     if not events and offset == 0:
-        await event.message.answer("⏳ Подождите немного, ищу мероприятия...")
+        total = await count_all_events()
 
-        try:
-            from app.handlers.channels import ChannelParser
-            from app.config import settings
+        if total == 0:
+            # БД пуста → запускаем парсер
+            await event.message.answer("⏳ Подождите немного, ищу мероприятия...")
 
-            channels = [
-                int(x.strip())
-                for x in settings.parser_channels.split(",")
-                if x.strip()
-            ]
+            try:
+                from app.handlers.channels import ChannelParser
+                from app.config import settings
 
-            if channels:
-                parser = ChannelParser()
-                await parser.run(channels=channels, limit=25)
-                del parser
-                logger.info("Парсер запущен для пользователя %s", user_id)
-        except Exception as e:
-            logger.exception("Ошибка парсера: %s", e)
+                channels = [
+                    int(x.strip())
+                    for x in settings.parser_channels.split(",")
+                    if x.strip()
+                ]
+
+                if channels:
+                    parser = ChannelParser()
+                    await parser.run(channels=channels, limit=25)
+                    del parser
+                    logger.info("Парсер запущен для пользователя %s", user_id)
+            except Exception as e:
+                logger.exception("Ошибка парсера: %s", e)
+                await event.message.answer(
+                    f"❌ Не удалось запустить парсер: {type(e).__name__}"
+                )
+                user_sessions.pop(user_id, None)
+                return
+
+            # Повторный запрос после парсинга
+            events = await get_upcoming_events(
+                category=category, limit=PAGE_SIZE, offset=offset
+            )
+        else:
+            # БД не пуста, но в категории пусто
             await event.message.answer(
-                f"❌ Не удалось запустить парсер: {type(e).__name__}"
+                f"😔 Пока нет мероприятий по категории «{title}».\n\n"
+                "Попробуй позже или выбери другую категорию."
             )
             user_sessions.pop(user_id, None)
             return
 
-        # Повторный запрос в БД после парсинга
-        events = await get_upcoming_events(
-            category=category, limit=PAGE_SIZE, offset=offset
-        )
-
     # Если и после парсинга пусто
     if not events:
         if offset == 0:
-            await event.message.answer(f"😔 По запросу «{title}» ничего не найдено.")
+            await event.message.answer(
+                f"😔 Пока нет мероприятий по категории «{title}»."
+            )
         else:
             await event.message.answer("Больше мероприятий по этому запросу нет")
 
@@ -186,27 +200,20 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
     counter = offset + 1
     for cat_key, items in grouped.items():
         cat_label = CATEGORY_TITLES.get(cat_key, "Без категории")
-
-        # Подзаголовок категории
         await event.message.answer(f"🎯 {cat_label}")
 
-        # Мероприятия этой категории
         for item in items:
             text_preview = item.message_text[:300]
             if len(item.message_text) > 300:
                 text_preview += "..."
 
-            await event.message.answer(
-                f"{counter}. {text_preview}"
-            )
+            await event.message.answer(f"{counter}. {text_preview}")
             counter += 1
             await asyncio.sleep(0.3)
 
-    # Спрашиваем про следующую страницу только если набралось PAGE_SIZE
+    # Спрашиваем, только если набралось PAGE_SIZE
     if len(events) < PAGE_SIZE:
-        # Больше нет — не спрашиваем
         user_sessions.pop(user_id, None)
         await event.message.answer("Это все мероприятия по данному запросу.")
     else:
-        # Возможно, есть ещё — спрашиваем
         await event.message.answer("Нужны ли ещё мероприятия? (Да / Нет)")

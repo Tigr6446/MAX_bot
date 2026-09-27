@@ -1,5 +1,5 @@
 """Запросы к БД для получения мероприятий."""
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 
 from app.database.model_1 import ParsedMessage, async_session
 
@@ -26,3 +26,12 @@ async def get_upcoming_events(
 
         result = await session.execute(query)
         return list(result.scalars().all())
+
+
+async def count_all_events() -> int:
+    #Возвращает общее количество мероприятий в БД.
+    async with async_session() as session:
+        result = await session.execute(
+            select(func.count(ParsedMessage.id))
+        )
+        return result.scalar_one()
