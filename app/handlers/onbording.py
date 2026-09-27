@@ -1,13 +1,14 @@
 """
 Онбординг пользователя в MAX через FSM.
 Собирает регион, город и категории интересов.
+
+Валидация региона и города — через analyzer.detect_location().
 """
 
 import logging
 
-from maxapi.types import BotStarted
 from maxapi.context import MemoryContext, State, StatesGroup
-from maxapi.types import MessageCreated
+from maxapi.types import BotStarted, MessageCreated
 from sqlalchemy.dialects.postgresql import insert
 
 from app.Analyzer.analyzer import analyzer
@@ -24,16 +25,18 @@ class Onboarding(StatesGroup):
 
 
 async def cmd_start(event, context: MemoryContext) -> None:
-    """Старт онбординга: работает и для /start, и для кнопки «Начать»."""
+    """
+    Старт онбординга.
+    Работает и для /start, и для кнопки «Начать» (BotStarted).
+    """
     await context.set_state(Onboarding.waiting_for_region)
 
-    # Определяем, откуда пришло событие
     if isinstance(event, BotStarted):
         # Кнопка «Начать» — нет event.message
         await event.bot.send_message(
             chat_id=event.chat_id,
             text=(
-                f"Привет! 👋\n\n"
+                "Привет! 👋\n\n"
                 "Я помогу подбирать для тебя ивенты. "
                 "Давай настроим профиль.\n\n"
                 "📍 Напиши свой регион (например: Московская область):"
@@ -43,34 +46,84 @@ async def cmd_start(event, context: MemoryContext) -> None:
         # Команда /start — есть event.message
         await event.message.answer(
             f"Привет, {event.from_user.first_name}! 👋\n\n"
+            "Я помогу подбирать для тебя ивенты. "
+            "Давай настроим профиль.\n\n"
             "📍 Напиши свой регион (например: Московская область):"
         )
 
 
 async def process_region(event: MessageCreated, context: MemoryContext) -> None:
-    """Получили регион → спрашиваем город."""
+    """
+    Получили регион → валидируем через анализатор.
+    Если регион не распознан — просим ввести заново.
+    """
     text = event.message.body.text if event.message.body else None
     if not text:
         return
 
-    await context.update_data(region=text.strip())
+    result = analyzer.detect_location(text)
+
+    if not result["region"]:
+        await event.message.answer(
+            "🤔 Не смог распознать регион. Попробуй написать иначе:\n\n"
+            "Например: Московская область, Республика Татарстан, "
+            "Свердловская область"
+        )
+        return
+
+    await context.update_data(region=result["region"])
     await context.set_state(Onboarding.waiting_for_city)
     await event.message.answer(
-        "Супер! 🏙 Теперь напиши свой город (например: Москва):"
+        f"📍 Регион: {result['region']}\n\n"
+        "🏙 Теперь напиши свой город (например: Москва):"
     )
 
 
 async def process_city(event: MessageCreated, context: MemoryContext) -> None:
-    """Получили город → спрашиваем категории."""
+    """
+    Получили город → валидируем через анализатор.
+    Проверяем, что город относится к указанному региону.
+    """
     text = event.message.body.text if event.message.body else None
     if not text:
         return
 
-    await context.update_data(city=text.strip())
+    data = await context.get_data()
+    saved_region = data.get("region")
+
+    result = analyzer.detect_location(text)
+
+    if not result["city"]:
+        await event.message.answer(
+            "🤔 Не смог распознать город. Попробуй написать иначе:\n\n"
+            "Например: Москва, Казань, Екатеринбург"
+        )
+        return
+
+    # Гео-конфликт: в тексте и регион, и город, но они не совпадают
+    if result["conflict"]:
+        await event.message.answer(
+            f"⚠️ {result['error_msg']}\n\n"
+            f"Ты указал регион: {saved_region}\n"
+            "Уточни город или напиши /start заново."
+        )
+        return
+
+    # В тексте указан город из другого региона
+    if result["region"] and result["region"] != saved_region:
+        await event.message.answer(
+            f"⚠️ Город {result['city']} относится к региону "
+            f"{result['region']}, а не к {saved_region}.\n\n"
+            "Уточни город или напиши /start заново."
+        )
+        return
+
+    await context.update_data(city=result["city"])
     await context.set_state(Onboarding.waiting_for_categories)
     await event.message.answer(
-        "Отлично! Последний шаг 🎯\n"
-        "Напиши категории, кторые тебя интересуют через запятую (или выбери что-то одно):\n\n"
+        f"🏙 Город: {result['city']}\n\n"
+        "🎯 Последний шаг! Напиши категории, которые тебя интересуют, "
+        "через запятую (или выбери что-то одно):\n\n"
         "Например: волонтёрство, наука, культура, тренинги"
     )
 
