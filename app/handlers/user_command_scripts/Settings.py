@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.Analyzer.analyzer import analyzer
 from app.database.model_3 import AsyncSessionLocal, User
-from app.handlers.onbording import Onboarding
+from app.handlers.user_command_scripts.onbording import Onboarding
 
 logger = logging.getLogger(__name__)
 

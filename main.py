@@ -11,15 +11,15 @@ from maxapi.webhook.fastapi import FastAPIMaxWebhook
 
 from app.config import settings
 from app.database.model_1 import init_db
-from app.handlers.CommandsUser import handle_user_command
-from app.handlers.onbording import (
+from app.handlers.user_command_scripts.CommandsUser import handle_user_command
+from app.handlers.user_command_scripts.onbording import (
     Onboarding,
     cmd_start,
     process_region,
     process_city,
     process_categories,
 )
-from app.handlers.Settings import (
+from app.handlers.user_command_scripts.Settings import (
     SettingsStates,
     cmd_settings,
     check_settings_intent,
