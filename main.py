@@ -71,6 +71,10 @@ router.message_created(StateFilter(SettingsStates.changing_categories))(save_new
 # --- Обёртка для обычных команд ---
 async def pre_user_command(event, context):
     """Проверяет настройки, иначе — обычные команды."""
+    # Игнорируем посты из каналов (from_user = None)
+    if not event.from_user:
+        return
+    
     is_settings_intent = await check_settings_intent(event, context)
     if is_settings_intent:
         return

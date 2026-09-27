@@ -14,7 +14,7 @@ from app.database.model_3 import User, AsyncSessionLocal
 logger = logging.getLogger(__name__)
 
 # Интервал опроса в секундах
-POLL_INTERVAL = 10  # 5 минут
+POLL_INTERVAL = 300  # 5 минут
 
 
 async def _get_max_message_id() -> int:
@@ -35,17 +35,20 @@ async def _get_new_events(last_id: int) -> list[ParsedMessage]:
         return list(result.scalars().all())
 
 
-async def _get_all_users() -> list[int]:
-    """Возвращает всех user_id из users."""
+async def _get_all_chat_ids() -> list[int]:
+    """Возвращает все chat_id из users (только не None)."""
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(User.id))
+        result = await session.execute(
+            select(User.chat_id).where(User.chat_id.isnot(None))
+        )
         return [row[0] for row in result.all()]
 
 
 async def _notify_users(bot, events: list[ParsedMessage]) -> None:
     """Рассылает новые мероприятия всем пользователям."""
-    user_ids = await _get_all_users()
-    if not user_ids:
+    chat_ids = await _get_all_chat_ids()
+    if not chat_ids:
+        logger.warning("Нет пользователей для рассылки")
         return
 
     CATEGORY_TITLES = {
@@ -70,17 +73,17 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
             f"{text_preview}"
         )
 
-        for user_id in user_ids:
+        for chat_id in chat_ids:
             try:
                 await bot.send_message(
-                    chat_id=user_id,
+                    chat_id=chat_id,
                     text=message_text,
                 )
                 await asyncio.sleep(0.3)
             except Exception as e:
                 logger.exception(
-                    "Не удалось отправить уведомление пользователю %s: %s",
-                    user_id, e,
+                    "Не удалось отправить уведомление chat_id=%s: %s",
+                    chat_id, e,
                 )
 
 

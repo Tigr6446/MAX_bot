@@ -9,9 +9,8 @@ import logging
 
 from maxapi.context import MemoryContext, State, StatesGroup
 from maxapi.types import BotStarted, MessageCreated
-
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 
 from app.Analyzer.analyzer import analyzer
 from app.database.model_3 import AsyncSessionLocal, User
@@ -41,7 +40,6 @@ async def cmd_start(event, context: MemoryContext) -> None:
     Работает и для /start, и для кнопки «Начать».
     Если пользователь уже зарегистрирован — просто приветствует.
     """
-    # Достаём user_id и имя из разных типов событий
     if isinstance(event, BotStarted):
         user_id = event.user.user_id
         first_name = event.user.first_name or "друг"
@@ -63,7 +61,8 @@ async def cmd_start(event, context: MemoryContext) -> None:
         )
         return
 
-    # Новый пользователь - запускаем онбординг
+    # Новый пользователь — чистый старт онбординга
+    await context.clear()
     await context.set_state(Onboarding.waiting_for_region)
     await answer(
         f"Привет, {first_name}! 👋\n\n"
@@ -71,6 +70,7 @@ async def cmd_start(event, context: MemoryContext) -> None:
         "Давай настроим профиль.\n\n"
         "📍 Напиши свой регион (например: Московская область):"
     )
+
 
 async def process_region(event: MessageCreated, context: MemoryContext) -> None:
     """
@@ -120,7 +120,6 @@ async def process_city(event: MessageCreated, context: MemoryContext) -> None:
         )
         return
 
-    # Гео-конфликт: в тексте и регион, и город, но они не совпадают
     if result["conflict"]:
         await event.message.answer(
             f"⚠️ {result['error_msg']}\n\n"
@@ -129,7 +128,6 @@ async def process_city(event: MessageCreated, context: MemoryContext) -> None:
         )
         return
 
-    # В тексте указан город из другого региона
     if result["region"] and result["region"] != saved_region:
         await event.message.answer(
             f"⚠️ Город {result['city']} относится к региону "
@@ -176,12 +174,14 @@ async def process_categories(event: MessageCreated, context: MemoryContext) -> N
     async with AsyncSessionLocal() as session:
         stmt = insert(User).values(
             id=user_id,
+            chat_id=event.chat.chat_id,
             region=data.get("region"),
             city=data.get("city"),
             categories=categories_str,
         ).on_conflict_do_update(
             index_elements=["id"],
             set_={
+                "chat_id": event.chat.chat_id,
                 "region": data.get("region"),
                 "city": data.get("city"),
                 "categories": categories_str,
