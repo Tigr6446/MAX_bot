@@ -10,12 +10,12 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+#Путь к data.json
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_DATA_PATH = os.path.join(BASE_DIR, "data.json")
 
 
 class HeuristicAnalyzer:
-    """Эвристический анализатор категорий и локаций."""
 
     def __init__(self, data_path: str = DEFAULT_DATA_PATH) -> None:
         self.data_path = data_path
@@ -42,7 +42,7 @@ class HeuristicAnalyzer:
             logger.error("Ошибка чтения %s: %s", self.data_path, e)
 
     def _compile_categories(self) -> None:
-        #Компиляция стем
+        #Компиляция стем и подготовка к проверкам
         for category, keywords in self.categories_data.items():
             compiled_list = []
             for keyword, weight in keywords.items():
@@ -59,17 +59,19 @@ class HeuristicAnalyzer:
         return re.sub(r"[^\w\s]", "", text.lower())
 
     def analyze_topic(self, text: Optional[str]) -> Optional[str]:
-        #Определение тематики мероприятия
+        #Определение категории
         cleaned = self._clean(text)
         if not cleaned:
             return None
 
+        #подсчитывает баллы
         scores = {cat: 0 for cat in self._compiled_categories}
         for category, patterns in self._compiled_categories.items():
             for pattern, weight in patterns:
                 if pattern.search(cleaned):
                     scores[category] += weight
 
+        #Возвращает категорию набрашую наибольшее кол-во балов
         best = max(scores, key=scores.get)
         return best if scores[best] > 0 else None
 
