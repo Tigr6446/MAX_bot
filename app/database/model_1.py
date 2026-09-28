@@ -38,7 +38,7 @@ class ParsedMessage(Base):
     message_id: Mapped[str] = mapped_column(
         String(100), unique=True, index=True
     )
-    message_text: Mapped[str] = mapped_column(Text) #убрать ограничение!!!
+    message_text: Mapped[str] = mapped_column(Text)
     category: Mapped[str | None] = mapped_column(
         String(50), nullable=True
     )
