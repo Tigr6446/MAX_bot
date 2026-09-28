@@ -51,48 +51,29 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
         logger.warning("Нет пользователей для рассылки")
         return
 
-    CATEGORY_TITLES = {
-        "volunteering": "Волонтёрство",
-        "forum": "Форумы и конференции",
-        "science": "Наука и образование",
-        "sport": "Спорт",
-        "culture": "Культура и искусство",
-        "workshop": "Мастер-классы и воркшопы",
-        "pushkin_card": "Пушкинская карта",
-    }
-
-    # 1. Группируем события по категориям
+    # Группируем по категориям (русские названия из БД)
     grouped: dict[str, list[ParsedMessage]] = {}
     for event in events:
-        cat_key = event.category or "other"
+        cat_key = event.category or "Без категории"
         grouped.setdefault(cat_key, []).append(event)
 
-    # 2. Для каждой категории формируем одно сообщение
     for cat_key, cat_events in grouped.items():
-        cat_label = CATEGORY_TITLES.get(cat_key, "Без категории")
-
-        # Заголовок
-        lines = [f"🔔 Новые мероприятия: {cat_label}\n"]
-
-                # Мероприятия
+        lines = [f"🔔 Новые мероприятия: {cat_key}\n"]
         for i, event in enumerate(cat_events, start=1):
             lines.append(f"{i}. {event.message_text}")
 
         message_text = "\n\n".join(lines)
 
-        # 3. Отправляем каждому пользователю
         for chat_id in chat_ids:
             try:
-                await bot.send_message(
-                    chat_id=chat_id,
-                    text=message_text,
-                )
+                await bot.send_message(chat_id=chat_id, text=message_text)
                 await asyncio.sleep(0.3)
             except Exception as e:
                 logger.exception(
                     "Не удалось отправить уведомление chat_id=%s: %s",
                     chat_id, e,
                 )
+
 
 async def parser_loop(bot) -> None:
     """
@@ -102,8 +83,6 @@ async def parser_loop(bot) -> None:
     logger.info("Фоновая задача парсера запущена")
 
     while True:
-        # 4. Спим 5 минут
-        await asyncio.sleep(POLL_INTERVAL)
         try:
             # 1. Запоминаем максимальный id ДО парсинга
             last_id = await _get_max_message_id()
@@ -136,4 +115,5 @@ async def parser_loop(bot) -> None:
         except Exception as e:
             logger.exception("Ошибка в parser_loop: %s", e)
 
-        
+        # 4. Спим 5 минут
+        await asyncio.sleep(POLL_INTERVAL)
