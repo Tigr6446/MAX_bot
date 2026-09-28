@@ -102,6 +102,8 @@ async def parser_loop(bot) -> None:
     logger.info("Фоновая задача парсера запущена")
 
     while True:
+        # 4. Спим 5 минут
+        await asyncio.sleep(POLL_INTERVAL)
         try:
             # 1. Запоминаем максимальный id ДО парсинга
             last_id = await _get_max_message_id()
@@ -134,5 +136,4 @@ async def parser_loop(bot) -> None:
         except Exception as e:
             logger.exception("Ошибка в parser_loop: %s", e)
 
-        # 4. Спим 5 минут
-        await asyncio.sleep(POLL_INTERVAL)
+        
