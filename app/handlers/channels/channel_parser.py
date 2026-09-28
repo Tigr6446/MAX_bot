@@ -66,26 +66,6 @@ class ChannelParser:
             pass
         return msg
 
-    @staticmethod
-    def _extract_links_from_elements(real_msg) -> str:
-        """
-        Извлекает 'вшитые' ссылки из elements.
-        Возвращает строку с URL через перевод строки, или пустую строку.
-        """
-        urls = []
-        elements = getattr(real_msg, "elements", None) or []
-
-        for el in elements:
-            # Element(type='LINK', attributes=ElementAttributes(url='...'))
-            el_type = getattr(el, "type", None)
-            if el_type == "LINK":
-                attrs = getattr(el, "attributes", None)
-                url = getattr(attrs, "url", None) if attrs else None
-                if url and url not in urls:
-                    urls.append(url)
-
-        return "\n".join(urls)
-
     async def run(self, channels: list[int], limit: int = 15) -> None:
         """
         Полный цикл парсера: логин → парсинг → анализ → БД → закрытие.
@@ -122,6 +102,10 @@ class ChannelParser:
                     # Если сообщение пересланное — работаем с оригиналом
                     real_msg = self._extract_real_message(msg)
 
+                    real_id = getattr(real_msg, "id", None)
+                    if not real_id:
+                        continue
+
                     # Текст из оригинала
                     text = getattr(real_msg, "text", None)
                     if not text:
@@ -156,28 +140,24 @@ class ChannelParser:
                     )
 
                     # --- ССЫЛКА НА ОРИГИНАЛ ---
-                    # Берём chat_link из оригинала, добавляем ID сообщения.
-                    chat_link = getattr(real_msg, "chat_link", None)
-                    real_id = getattr(real_msg, "id", None)
-                    post_url = (
-                        f"{chat_link}/{real_id}"
-                        if chat_link and real_id
-                        else None
-                    )
+                    # Ищем в elements ссылку вида max.ru/канал/код_поста
+                    post_url = None
+                    elements = getattr(real_msg, "elements", None) or []
+                    for el in elements:
+                        if getattr(el, "type", None) == "LINK":
+                            attrs = getattr(el, "attributes", None)
+                            url = getattr(attrs, "url", None) if attrs else None
+                            if not url or "max.ru/" not in url:
+                                continue
 
-                    # --- ВШИТЫЕ ССЫЛКИ ---
-                    # Извлекаем URL из elements и дописываем к тексту,
-                    # если их нет в самом тексте.
-                    elements_links = self._extract_links_from_elements(real_msg)
-                    full_text = text
-                    if elements_links:
-                        # Дописываем только те ссылки, которых нет в тексте
-                        missing = [
-                            url for url in elements_links.split("\n")
-                            if url and url not in text
-                        ]
-                        if missing:
-                            full_text += "\n\n🔗 " + "\n🔗 ".join(missing)
+                            # Разбираем URL: max.ru/<segment1>/<segment2>
+                            after_domain = url.split("max.ru/", 1)[1].strip("/")
+                            parts = after_domain.split("/")
+
+                            # Ссылка на пост: ровно 2 сегмента (канал/код)
+                            if len(parts) == 2 and parts[0] and parts[1]:
+                                post_url = url
+                                break
 
                     # --- ДЕДУПЛИКАЦИЯ ---
                     existing = await session.execute(
@@ -192,7 +172,7 @@ class ChannelParser:
                     # --- СОХРАНЕНИЕ ---
                     session.add(ParsedMessage(
                         message_id=str(real_id),
-                        message_text=full_text,
+                        message_text=text,
                         category=category,
                         post_url=post_url,
                         event_date=event_date,
