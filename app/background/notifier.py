@@ -65,7 +65,10 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
     for cat_key, cat_events in grouped.items():
         lines = [f"🔔 Новые мероприятия: {cat_key}\n"]
         for i, event in enumerate(cat_events, start=1):
-            lines.append(f"{i}. {event.message_text}")
+            text = f"{i}. {event.message_text}"
+            if event.post_url:
+                text += f"\n\n🔗 Оригинал: {event.post_url}"
+            lines.append(text)
 
         message_text = "\n\n".join(lines)
 
@@ -78,7 +81,6 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
                     "Не удалось отправить уведомление chat_id=%s: %s",
                     chat_id, e,
                 )
-
 
 async def parser_loop(bot) -> None:
     """

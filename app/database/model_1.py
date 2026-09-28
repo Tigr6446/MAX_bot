@@ -46,11 +46,20 @@ class ParsedMessage(Base):
     message_text: Mapped[str] = mapped_column(Text)
     category: Mapped[str | None] = mapped_column(nullable=True)
 
+    # Ссылка на оригинальный пост в MAX
+    post_url: Mapped[str | None] = mapped_column(
+        String(500), nullable=True
+    )
+
     # Дата окончания события (naive UTC). None = дата не найдена.
-    event_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    event_date: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
 
     # Когда пост добавлен (naive UTC) — для fallback-таймера 5 дней.
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow_naive)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow_naive
+    )
 
 
 async def init_db() -> None:

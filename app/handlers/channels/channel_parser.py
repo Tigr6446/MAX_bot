@@ -15,6 +15,7 @@ from pymax import (
     SyncOverrides,
     WebClient,
 )
+from pymax.types.domain.enums import LinkType
 from sqlalchemy import select
 
 from app.Analyzer.analyzer import analyzer
@@ -52,6 +53,39 @@ class ChannelParser:
             ),
         )
 
+    @staticmethod
+    def _extract_real_message(msg):
+        """
+        Если сообщение пересланное — берём оригинал внутри link.message.
+        Иначе — возвращаем само сообщение.
+        """
+        try:
+            if msg.link and msg.link.type == LinkType.FORWARD:
+                return msg.link.message
+        except Exception:
+            pass
+        return msg
+
+    @staticmethod
+    def _extract_links_from_elements(real_msg) -> str:
+        """
+        Извлекает 'вшитые' ссылки из elements.
+        Возвращает строку с URL через перевод строки, или пустую строку.
+        """
+        urls = []
+        elements = getattr(real_msg, "elements", None) or []
+
+        for el in elements:
+            # Element(type='LINK', attributes=ElementAttributes(url='...'))
+            el_type = getattr(el, "type", None)
+            if el_type == "LINK":
+                attrs = getattr(el, "attributes", None)
+                url = getattr(attrs, "url", None) if attrs else None
+                if url and url not in urls:
+                    urls.append(url)
+
+        return "\n".join(urls)
+
     async def run(self, channels: list[int], limit: int = 15) -> None:
         """
         Полный цикл парсера: логин → парсинг → анализ → БД → закрытие.
@@ -85,18 +119,22 @@ class ChannelParser:
             # Открываем сессию БД на канал
             async with async_session() as session:
                 for msg in history:
-                    # Пропускаем посты без текста
-                    if not msg.text:
+                    # Если сообщение пересланное — работаем с оригиналом
+                    real_msg = self._extract_real_message(msg)
+
+                    # Текст из оригинала
+                    text = getattr(real_msg, "text", None)
+                    if not text:
                         continue
 
                     # Прогоняем сообщение через полный эвристический анализатор
-                    analysis = analyzer.analyze_message(msg.text)
+                    analysis = analyzer.analyze_message(text)
 
                     if not analysis["is_event"]:
                         garbage_total += 1
                         logger.debug(
                             "Пост %s пропущен: %s",
-                            msg.id, analysis["reason"],
+                            real_msg.id, analysis["reason"],
                         )
                         continue
 
@@ -106,7 +144,7 @@ class ChannelParser:
                         garbage_total += 1
                         logger.debug(
                             "Пост %s пропущен: категория не определена",
-                            msg.id,
+                            real_msg.id,
                         )
                         continue
 
@@ -117,10 +155,34 @@ class ChannelParser:
                         else None
                     )
 
+                    # --- ССЫЛКА НА ОРИГИНАЛ ---
+                    # Берём chat_link из оригинала, добавляем ID сообщения.
+                    chat_link = getattr(real_msg, "chat_link", None)
+                    real_id = getattr(real_msg, "id", None)
+                    post_url = (
+                        f"{chat_link}/{real_id}"
+                        if chat_link and real_id
+                        else None
+                    )
+
+                    # --- ВШИТЫЕ ССЫЛКИ ---
+                    # Извлекаем URL из elements и дописываем к тексту,
+                    # если их нет в самом тексте.
+                    elements_links = self._extract_links_from_elements(real_msg)
+                    full_text = text
+                    if elements_links:
+                        # Дописываем только те ссылки, которых нет в тексте
+                        missing = [
+                            url for url in elements_links.split("\n")
+                            if url and url not in text
+                        ]
+                        if missing:
+                            full_text += "\n\n🔗 " + "\n🔗 ".join(missing)
+
                     # --- ДЕДУПЛИКАЦИЯ ---
                     existing = await session.execute(
                         select(ParsedMessage).where(
-                            ParsedMessage.message_id == str(msg.id)
+                            ParsedMessage.message_id == str(real_id)
                         )
                     )
                     if existing.scalar_one_or_none():
@@ -129,9 +191,10 @@ class ChannelParser:
 
                     # --- СОХРАНЕНИЕ ---
                     session.add(ParsedMessage(
-                        message_id=str(msg.id),
-                        message_text=msg.text,
+                        message_id=str(real_id),
+                        message_text=full_text,
                         category=category,
+                        post_url=post_url,
                         event_date=event_date,
                     ))
                     saved_total += 1
