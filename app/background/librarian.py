@@ -1,4 +1,4 @@
-import asyncio
+п»їimport asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete
@@ -6,20 +6,20 @@ from app.database.model_1 import ParsedMessage, async_session
 
 logger = logging.getLogger(__name__)
 
-# Интервал проверки: 6 часов (в секундах)
+# РРЅС‚РµСЂРІР°Р» РїСЂРѕРІРµСЂРєРё: 6 С‡Р°СЃРѕРІ (РІ СЃРµРєСѓРЅРґР°С…)
 LIBRARIAN_INTERVAL = 21600 
 
 async def clean_expired_events() -> None:
-    # Удаляет устаревшие события и посты без даты старше 5 дней
+    # РЈРґР°Р»СЏРµС‚ СѓСЃС‚Р°СЂРµРІС€РёРµ СЃРѕР±С‹С‚РёСЏ Рё РїРѕСЃС‚С‹ Р±РµР· РґР°С‚С‹ СЃС‚Р°СЂС€Рµ 5 РґРЅРµР№
     now = datetime.now(timezone.utc)
     five_days_ago = now - timedelta(days=5)
     
-    # Даем событию полностью пройти (удаляем на следующий день)
+    # Р”Р°РµРј СЃРѕР±С‹С‚РёСЋ РїРѕР»РЅРѕСЃС‚СЊСЋ РїСЂРѕР№С‚Рё (СѓРґР°Р»СЏРµРј РЅР° СЃР»РµРґСѓСЋС‰РёР№ РґРµРЅСЊ)
     yesterday = now - timedelta(days=1)
 
     async with async_session() as session:
         try:
-            # Удаляем посты БЕЗ даты окончания, которым больше 5 дней с момента парсинга
+            # РЈРґР°Р»СЏРµРј РїРѕСЃС‚С‹ Р‘Р•Р— РґР°С‚С‹ РѕРєРѕРЅС‡Р°РЅРёСЏ, РєРѕС‚РѕСЂС‹Рј Р±РѕР»СЊС€Рµ 5 РґРЅРµР№ СЃ РјРѕРјРµРЅС‚Р° РїР°СЂСЃРёРЅРіР°
             result_no_date = await session.execute(
                 delete(ParsedMessage).where(
                     ParsedMessage.event_date.is_(None),
@@ -27,7 +27,7 @@ async def clean_expired_events() -> None:
                 )
             )
             
-            # даляем посты с датой окончания, которая уже ПРОШЛА (учитывая весь день события)
+            # РґР°Р»СЏРµРј РїРѕСЃС‚С‹ СЃ РґР°С‚РѕР№ РѕРєРѕРЅС‡Р°РЅРёСЏ, РєРѕС‚РѕСЂР°СЏ СѓР¶Рµ РџР РћРЁР›Рђ (СѓС‡РёС‚С‹РІР°СЏ РІРµСЃСЊ РґРµРЅСЊ СЃРѕР±С‹С‚РёСЏ)
             result_expired = await session.execute(
                 delete(ParsedMessage).where(
                     ParsedMessage.event_date.isnot(None),
@@ -39,17 +39,17 @@ async def clean_expired_events() -> None:
             
             deleted_count = (result_no_date.rowcount or 0) + (result_expired.rowcount or 0)
             if deleted_count > 0:
-                logger.info("Библиотекарь очистил базу: удалено устаревших записей: %d", deleted_count)
+                logger.info("Р‘РёР±Р»РёРѕС‚РµРєР°СЂСЊ РѕС‡РёСЃС‚РёР» Р±Р°Р·Сѓ: СѓРґР°Р»РµРЅРѕ СѓСЃС‚Р°СЂРµРІС€РёС… Р·Р°РїРёСЃРµР№: %d", deleted_count)
             else:
-                logger.debug("Библиотекарь проверил базу: удалять нечего")
+                logger.debug("Р‘РёР±Р»РёРѕС‚РµРєР°СЂСЊ РїСЂРѕРІРµСЂРёР» Р±Р°Р·Сѓ: СѓРґР°Р»СЏС‚СЊ РЅРµС‡РµРіРѕ")
 
         except Exception as e:
-            logger.exception("Ошибка в работе Библиотекаря: %s", e)
+            logger.exception("РћС€РёР±РєР° РІ СЂР°Р±РѕС‚Рµ Р‘РёР±Р»РёРѕС‚РµРєР°СЂСЏ: %s", e)
             await session.rollback()
 
 async def librarian_loop() -> None:
-    # Бесконечный фоновый цикл Библиотекаря
-    logger.info("Фоновая задача 'Библиотекарь' запущена")
+    # Р‘РµСЃРєРѕРЅРµС‡РЅС‹Р№ С„РѕРЅРѕРІС‹Р№ С†РёРєР» Р‘РёР±Р»РёРѕС‚РµРєР°СЂСЏ
+    logger.info("Р¤РѕРЅРѕРІР°СЏ Р·Р°РґР°С‡Р° 'Р‘РёР±Р»РёРѕС‚РµРєР°СЂСЊ' Р·Р°РїСѓС‰РµРЅР°")
     while True:
         await clean_expired_events()
         await asyncio.sleep(LIBRARIAN_INTERVAL)
