@@ -6,12 +6,12 @@ from app.database.model_1 import ParsedMessage, async_session
 
 logger = logging.getLogger(__name__)
 
-# Интервал проверки: 6 часов (в секундах)
-LIBRARIAN_INTERVAL = 21600 
+# Интервал проверки: 6 часов (в секундах - 21600)
+LIBRARIAN_INTERVAL = 120
 
 async def clean_expired_events() -> None:
     # Удаляет устаревшие события и посты без даты старше 5 дней
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)  # naive UTC
     five_days_ago = now - timedelta(days=5)
     
     # Даем событию полностью пройти (удаляем на следующий день)

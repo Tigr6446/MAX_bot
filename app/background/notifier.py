@@ -14,7 +14,7 @@ from app.database.model_3 import User, AsyncSessionLocal
 logger = logging.getLogger(__name__)
 
 # Интервал опроса в секундах
-POLL_INTERVAL = 20  # 5 минут
+POLL_INTERVAL = 300  # 5 минут
 
 
 async def _get_max_message_id() -> int:
@@ -51,11 +51,16 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
         logger.warning("Нет пользователей для рассылки")
         return
 
-    # Группируем по категориям (русские названия из БД)
+    # Группируем по категориям (только посты с категорией)
     grouped: dict[str, list[ParsedMessage]] = {}
     for event in events:
-        cat_key = event.category or "Без категории"
-        grouped.setdefault(cat_key, []).append(event)
+        if not event.category:
+            continue
+        grouped.setdefault(event.category, []).append(event)
+
+    if not grouped:
+        logger.info("Нет событий с категориями для рассылки")
+        return
 
     for cat_key, cat_events in grouped.items():
         lines = [f"🔔 Новые мероприятия: {cat_key}\n"]
@@ -83,11 +88,14 @@ async def parser_loop(bot) -> None:
     logger.info("Фоновая задача парсера запущена")
 
     while True:
+        # 1. Спим 5 минут
+        await asyncio.sleep(POLL_INTERVAL)
+        
         try:
-            # 1. Запоминаем максимальный id ДО парсинга
+            # 2. Запоминаем максимальный id ДО парсинга
             last_id = await _get_max_message_id()
 
-            # 2. Запускаем парсер
+            # 3. Запускаем парсер
             from app.handlers.channels import ChannelParser
 
             channels = [
@@ -103,7 +111,7 @@ async def parser_loop(bot) -> None:
                 await parser.run(channels=channels, limit=5)
                 del parser
 
-                # 3. Смотрим, что нового
+                # 4. Смотрим, что нового
                 new_events = await _get_new_events(last_id)
 
                 if new_events:
@@ -115,5 +123,4 @@ async def parser_loop(bot) -> None:
         except Exception as e:
             logger.exception("Ошибка в parser_loop: %s", e)
 
-        # 4. Спим 5 минут
-        await asyncio.sleep(POLL_INTERVAL)
+        

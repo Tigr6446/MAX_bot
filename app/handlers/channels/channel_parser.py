@@ -17,7 +17,7 @@ from pymax import (
 )
 from sqlalchemy import select
 
-from app.Analyzer.analyzer import analyzer, extract_event_date
+from app.Analyzer.analyzer import analyzer
 from app.database.model_1 import ParsedMessage, async_session
 
 logger = logging.getLogger(__name__)
@@ -94,20 +94,30 @@ class ChannelParser:
 
                     if not analysis["is_event"]:
                         garbage_total += 1
-                        logger.debug("Пост %s пропущен: %s", msg.id, analysis["reason"])
+                        logger.debug(
+                            "Пост %s пропущен: %s",
+                            msg.id, analysis["reason"],
+                        )
                         continue
 
-                    # 2. Достаём результаты анализа
+                    # Достаём категорию
                     category = analysis["category"]
-                    
-                    # Преобразуем строковую дату "YYYY-MM-DD" обратно в объект datetime для БД (если дата найдена)
+                    if not category:
+                        garbage_total += 1
+                        logger.debug(
+                            "Пост %s пропущен: категория не определена",
+                            msg.id,
+                        )
+                        continue
+
+                    # Преобразуем строковую дату "YYYY-MM-DD" обратно в datetime
                     event_date = (
-                        datetime.strptime(analysis["date"], "%Y-%m-%d") 
-                        if analysis["date"] else None
+                        datetime.strptime(analysis["date"], "%Y-%m-%d")
+                        if analysis["date"]
+                        else None
                     )
 
                     # --- ДЕДУПЛИКАЦИЯ ---
-                    # Проверяем, есть ли уже запись с таким message_id
                     existing = await session.execute(
                         select(ParsedMessage).where(
                             ParsedMessage.message_id == str(msg.id)

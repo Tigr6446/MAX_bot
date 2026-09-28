@@ -160,17 +160,29 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
         user_sessions.pop(user_id, None)
         return
 
-    # Группировка по категориям (русские названия из БД)
+    # Группировка по категориям (только посты с категорией)
     grouped: dict[str, list] = {}
     for item in events:
-        cat_key = item.category or "Без категории"
-        grouped.setdefault(cat_key, []).append(item)
+        if not item.category:
+            continue
+        grouped.setdefault(item.category, []).append(item)
+
+    if not grouped:
+        await event.message.answer(
+            f"😔 Пока нет мероприятий по категории «{title}»."
+        )
+        user_sessions.pop(user_id, None)
+        return
 
     await event.message.answer(f"📌 {title}\n")
 
+    # Показываем заголовок категории только если их несколько
+    show_category_headers = len(grouped) > 1
+
     counter = offset + 1
     for cat_key, items in grouped.items():
-        await event.message.answer(f"🎯 {cat_key}")
+        if show_category_headers:
+            await event.message.answer(f"🎯 {cat_key}")
         for item in items:
             await event.message.answer(f"{counter}. {item.message_text}")
             counter += 1

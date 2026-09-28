@@ -33,6 +33,9 @@ from app.handlers.user_command_scripts.Settings import (
 from app.background.notifier import parser_loop
 from app.background.librarian import librarian_loop
 
+dp = Dispatcher()
+router = Router()
+bot = Bot(settings.max_bot_token)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -49,10 +52,6 @@ async def lifespan(app: FastAPI):
     # При завершении — отменяем задачу
     parser_task.cancel()
     librarian_task.cancel() # Вырубаем библиотекаря
-
-dp = Dispatcher()
-router = Router()
-bot = Bot(settings.max_bot_token)
 
 # --- Онбординг ---
 router.bot_started()(cmd_start)
