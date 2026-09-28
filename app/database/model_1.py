@@ -1,6 +1,8 @@
+"""Модели и подключение к БД."""
+
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import DateTime, String, Text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -29,6 +31,11 @@ async_session = async_sessionmaker(
 )
 
 
+def _utcnow_naive() -> datetime:
+    """Naive UTC datetime (без tzinfo) — совместим с TIMESTAMP WITHOUT TIME ZONE."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class ParsedMessage(Base):
     """Сохранённое сообщение из канала с определённой категорией."""
 
@@ -43,18 +50,19 @@ class ParsedMessage(Base):
         String(50), nullable=True
     )
 
-    # Дата окончания события (если найдена)
+    # Дата окончания события (naive UTC). None = дата не найдена.
     event_date: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
     )
 
-    # Дата добавления поста в базу (нужна для 5-дневного таймера)
+    # Когда пост добавлен (naive UTC) — для fallback-таймера 5 дней.
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime,
+        default=_utcnow_naive,
     )
 
 
 async def init_db() -> None:
-    #Создаёт таблицы при старте приложения.
+    """Создаёт таблицы при старте приложения."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
