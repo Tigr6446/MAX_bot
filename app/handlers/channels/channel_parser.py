@@ -6,6 +6,7 @@
 
 import asyncio
 import logging
+from datetime import datetime
 
 from pymax import (
     ConsoleQrHandler,
@@ -67,6 +68,7 @@ class ChannelParser:
 
         saved_total = 0
         skipped_total = 0
+        garbage_total = 0
 
         # Идём по каналам по очереди
         for i, chat_id in enumerate(channels):
@@ -87,13 +89,22 @@ class ChannelParser:
                     if not msg.text:
                         continue
 
-                    # Прогоняем через эвристический анализатор
-                    category = analyzer.analyze(msg.text)
-                    if not category:
+                    # Прогоняем сообщение через полный эвристический анализатор
+                    analysis = analyzer.analyze_message(msg.text)
+
+                    if not analysis["is_event"]:
+                        garbage_total += 1
+                        logger.debug("Пост %s пропущен: %s", msg.id, analysis["reason"])
                         continue
 
-                    # Для даты
-                    event_date = extract_event_date(msg.text)
+                    # 2. Достаём результаты анализа
+                    category = analysis["category"]
+                    
+                    # Преобразуем строковую дату "YYYY-MM-DD" обратно в объект datetime для БД (если дата найдена)
+                    event_date = (
+                        datetime.strptime(analysis["date"], "%Y-%m-%d") 
+                        if analysis["date"] else None
+                    )
 
                     # --- ДЕДУПЛИКАЦИЯ ---
                     # Проверяем, есть ли уже запись с таким message_id
@@ -125,8 +136,8 @@ class ChannelParser:
                 await asyncio.sleep(2)
 
         logger.info(
-            "Итого: сохранено %d, пропущено дубликатов %d",
-            saved_total, skipped_total,
+            "Итого: сохранено %d, пропущено дубликатов %d, отсеяно мусора %d",
+            saved_total, skipped_total, garbage_total,
         )
 
         # Останавливаем клиент и подчищаем фоновую задачу
