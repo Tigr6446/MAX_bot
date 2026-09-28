@@ -42,24 +42,15 @@ class ParsedMessage(Base):
     __tablename__ = "parsed_message"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    message_id: Mapped[str] = mapped_column(
-        String(100), unique=True, index=True
-    )
+    message_id: Mapped[str] = mapped_column(unique=True, index=True)
     message_text: Mapped[str] = mapped_column(Text)
-    category: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
-    )
+    category: Mapped[str | None] = mapped_column(nullable=True)
 
     # Дата окончания события (naive UTC). None = дата не найдена.
-    event_date: Mapped[datetime | None] = mapped_column(
-        DateTime, nullable=True
-    )
+    event_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Когда пост добавлен (naive UTC) — для fallback-таймера 5 дней.
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=_utcnow_naive,
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow_naive)
 
 
 async def init_db() -> None:
