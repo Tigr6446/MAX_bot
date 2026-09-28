@@ -16,7 +16,7 @@ from pymax import (
 )
 from sqlalchemy import select
 
-from app.Analyzer.analyzer import analyzer
+from app.Analyzer.analyzer import analyzer, extract_event_date
 from app.database.model_1 import ParsedMessage, async_session
 
 logger = logging.getLogger(__name__)
@@ -92,6 +92,9 @@ class ChannelParser:
                     if not category:
                         continue
 
+                    # Для даты
+                    event_date = extract_event_date(msg.text)
+
                     # --- ДЕДУПЛИКАЦИЯ ---
                     # Проверяем, есть ли уже запись с таким message_id
                     existing = await session.execute(
@@ -108,6 +111,7 @@ class ChannelParser:
                         message_id=str(msg.id),
                         message_text=msg.text,
                         category=category,
+                        event_date=event_date,
                     ))
                     saved_total += 1
 

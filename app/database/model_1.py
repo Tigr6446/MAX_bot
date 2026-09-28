@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import DateTime, String, Text, func
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -38,14 +38,19 @@ class ParsedMessage(Base):
     message_id: Mapped[str] = mapped_column(
         String(100), unique=True, index=True
     )
-    message_text: Mapped[str] = mapped_column() #убрать ограничение!!!
+    message_text: Mapped[str] = mapped_column(Text) #убрать ограничение!!!
     category: Mapped[str | None] = mapped_column(
         String(50), nullable=True
     )
 
-    # Поля под код НИКИТЫ (пока не заполняются парсером)
+    # Дата окончания события (если найдена)
     event_date: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
+    )
+
+    # Дата добавления поста в базу (нужна для 5-дневного таймера)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
 

@@ -31,6 +31,7 @@ from app.handlers.user_command_scripts.Settings import (
 )
 
 from app.background.notifier import parser_loop
+from app.background.librarian import librarian_loop
 
 
 @asynccontextmanager
@@ -39,13 +40,15 @@ async def lifespan(app: FastAPI):
     
     # Запускаем фоновую задачу парсера
     parser_task = asyncio.create_task(parser_loop(bot))
+    # Запускаем библиотекаря
+    librarian_task = asyncio.create_task(librarian_loop())
     
     async with webhook.lifespan(app):
         yield
     
     # При завершении — отменяем задачу
     parser_task.cancel()
-
+    librarian_task.cancel() # Вырубаем библиотекаря
 
 dp = Dispatcher()
 router = Router()
