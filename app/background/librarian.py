@@ -42,7 +42,7 @@ async def clean_expired_events() -> None:
             if deleted_count > 0:
                 logger.info("Библиотекарь очистил базу: удалено устаревших записей: %d", deleted_count)
             else:
-                logger.debug("Библиотекарь проверил базу: удалять нечего.")
+                logger.debug("Библиотекарь проверил базу: удалять нечего")
 
         except Exception as e:
             logger.exception("Ошибка в работе Библиотекаря: %s", e)
@@ -50,7 +50,7 @@ async def clean_expired_events() -> None:
 
 async def librarian_loop() -> None:
     #Бесконечный фоновый цикл Библиотекаря
-    logger.info("Фоновая задача 'Библиотекарь' запущена.")
+    logger.info("Фоновая задача 'Библиотекарь' запущена")
     while True:
         await clean_expired_events()
         await asyncio.sleep(LIBRARIAN_INTERVAL)
