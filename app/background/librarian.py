@@ -1,4 +1,3 @@
-
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
@@ -7,12 +6,12 @@ from app.database.model_1 import ParsedMessage, async_session
 
 logger = logging.getLogger(__name__)
 
-# Интервал проверки 6 часов
+# Интервал проверки: 6 часов (в секундах)
 LIBRARIAN_INTERVAL = 21600 
 
 async def clean_expired_events() -> None:
-    #Удаляет устаревшие события и посты без даты старше 5 дней
-    now = datetime.utcnow()
+    # Удаляет устаревшие события и посты без даты старше 5 дней
+    now = datetime.now(timezone.utc)
     five_days_ago = now - timedelta(days=5)
     
     # Даем событию полностью пройти (удаляем на следующий день)
@@ -28,7 +27,7 @@ async def clean_expired_events() -> None:
                 )
             )
             
-            # Удаляем посты с датой окончания, которая уже ПРОШЛА (учитывая весь день события)
+            # даляем посты с датой окончания, которая уже ПРОШЛА (учитывая весь день события)
             result_expired = await session.execute(
                 delete(ParsedMessage).where(
                     ParsedMessage.event_date.isnot(None),
@@ -49,7 +48,7 @@ async def clean_expired_events() -> None:
             await session.rollback()
 
 async def librarian_loop() -> None:
-    #Бесконечный фоновый цикл Библиотекаря
+    # Бесконечный фоновый цикл Библиотекаря
     logger.info("Фоновая задача 'Библиотекарь' запущена")
     while True:
         await clean_expired_events()
