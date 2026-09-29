@@ -69,17 +69,16 @@ class ChannelParser:
     @staticmethod
     def _inject_links_into_text(real_msg) -> str:
         """
-        Вшивает ссылки обратно в анкоры в формате markdown:
-        [анкор](url).
-
-        Работает по позициям from/length из elements.
-        Если URL уже есть в тексте — пропускает (дубликат).
-        Заменяет с конца, чтобы позиции не сдвигались.
+        Вшивает ссылки в анкоры в формате markdown: [анкор](url).
+        Работает с позициями from/length, которые MAX считает в БАЙТАХ UTF-8.
         """
         text = getattr(real_msg, "text", None) or ""
         elements = getattr(real_msg, "elements", None) or []
 
-        # Собираем LINK-элементы с позициями и URL
+        if not text:
+            return text
+
+        # Собираем LINK-элементы
         links: list[tuple[int, int, str]] = []
         for el in elements:
             if getattr(el, "type", None) != "LINK":
@@ -93,6 +92,10 @@ class ChannelParser:
             if from_pos is None or length is None or not url:
                 continue
 
+            # Пропускаем почты
+            if url.startswith("mailto:") or ("@" in url and not url.startswith("http")):
+                continue
+
             # Пропускаем, если URL уже есть в тексте (обычная ссылка)
             if url in text:
                 continue
@@ -102,16 +105,24 @@ class ChannelParser:
         if not links:
             return text
 
-        # Сортируем по позиции в обратном порядке — замена не сдвигает индексы
+        # Работаем с байтами: MAX считает позиции в байтах UTF-8
+        text_bytes = text.encode("utf-8")
+
+        # Сортируем по позиции в обратном порядке
         links.sort(key=lambda x: x[0], reverse=True)
 
-        result = text
+        result_bytes = text_bytes
         for from_pos, length, url in links:
-            # Страховка от выхода за границы
-            if from_pos < 0 or from_pos + length > len(result):
+            if from_pos < 0 or from_pos + length > len(result_bytes):
                 continue
 
-            anchor = result[from_pos:from_pos + length]
+            # Срез по байтам
+            anchor_bytes = result_bytes[from_pos:from_pos + length]
+            try:
+                anchor = anchor_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                # Если срез порвал символ — пропускаем эту ссылку
+                continue
 
             if not anchor.strip():
                 continue
@@ -119,10 +130,19 @@ class ChannelParser:
             # Экранируем квадратные скобки в анкоре
             anchor_safe = anchor.replace("[", "\\[").replace("]", "\\]")
 
-            replacement = f"[{anchor_safe}]({url})"
-            result = result[:from_pos] + replacement + result[from_pos + length:]
+            replacement = f"[{anchor_safe}]({url})".encode("utf-8")
 
-        return result
+            result_bytes = (
+                result_bytes[:from_pos]
+                + replacement
+                + result_bytes[from_pos + length:]
+            )
+
+        try:
+            return result_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            # Если что-то пошло не так — возвращаем исходный текст
+            return text
 
     async def run(self, channels: list[int], limit: int = 15) -> None:
         """
