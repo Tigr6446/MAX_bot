@@ -35,23 +35,33 @@ async def _get_new_events(last_id: int) -> list[ParsedMessage]:
         return list(result.scalars().all())
 
 
-async def _get_all_chat_ids() -> list[int]:
-    """Возвращает все chat_id из users (только не None)."""
+async def _get_users_with_categories() -> list[tuple[int, set[str]]]:
+    """
+    Возвращает список (chat_id, set(категорий)) для всех пользователей
+    с заполненным chat_id.
+    """
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            select(User.chat_id).where(User.chat_id.isnot(None))
+            select(User.chat_id, User.categories).where(User.chat_id.isnot(None))
         )
-        return [row[0] for row in result.all()]
+        users: list[tuple[int, set[str]]] = []
+        for chat_id, categories in result.all():
+            if not categories:
+                cats: set[str] = set()
+            else:
+                cats = {c.strip() for c in categories.split(",") if c.strip()}
+            users.append((chat_id, cats))
+        return users
 
 
 async def _notify_users(bot, events: list[ParsedMessage]) -> None:
-    """Рассылает новые мероприятия, сгруппированные по категориям."""
-    chat_ids = await _get_all_chat_ids()
-    if not chat_ids:
+    """Рассылает новые мероприятия по категориям пользователей."""
+    users = await _get_users_with_categories()
+    if not users:
         logger.warning("Нет пользователей для рассылки")
         return
 
-    # Группируем по категориям (только посты с категорией)
+    # Группируем события по категориям
     grouped: dict[str, list[ParsedMessage]] = {}
     for event in events:
         if not event.category:
@@ -62,22 +72,46 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
         logger.info("Нет событий с категориями для рассылки")
         return
 
-    for cat_key, cat_events in grouped.items():
-        lines = [f"🔔 Новые мероприятия: {cat_key}\n"]
-        for i, event in enumerate(cat_events, start=1):
-            lines.append(f"{i}. {event.message_text}")
+    # Каждому пользователю — только его категории
+    for chat_id, user_cats in users:
+        # Если у пользователя не заданы категории — пропускаем
+        if not user_cats:
+            continue
+
+        # Собираем события, подходящие под интересы юзера
+        matching: list[ParsedMessage] = []
+        for cat_key, cat_events in grouped.items():
+            if cat_key in user_cats:
+                matching.extend(cat_events)
+
+        if not matching:
+            continue
+
+        # Формируем текст: по категориям, с разделителями
+        lines: list[str] = ["🔔 Новые мероприятия для тебя\n"]
+        for cat_key in user_cats:
+            cat_events = grouped.get(cat_key)
+            if not cat_events:
+                continue
+            lines.append("--------------")
+            lines.append(f"🎯 {cat_key}")
+            for i, event in enumerate(cat_events, start=1):
+                lines.append(f"{i}. {event.message_text}")
 
         message_text = "\n\n".join(lines)
 
-        for chat_id in chat_ids:
-            try:
-                await bot.send_message(chat_id=chat_id, text=message_text, format="markdown")
-                await asyncio.sleep(0.3)
-            except Exception as e:
-                logger.exception(
-                    "Не удалось отправить уведомление chat_id=%s: %s",
-                    chat_id, e,
-                )
+        try:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=message_text,
+                format="markdown",
+            )
+            await asyncio.sleep(0.3)
+        except Exception as e:
+            logger.exception(
+                "Не удалось отправить уведомление chat_id=%s: %s",
+                chat_id, e,
+            )
 
 async def parser_loop(bot) -> None:
     """
