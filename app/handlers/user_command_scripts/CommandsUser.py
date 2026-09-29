@@ -182,7 +182,7 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
     counter = offset + 1
     for cat_key, items in grouped.items():
         if show_category_headers:
-            await event.message.answer("--------------")
+            await event.message.answer("-"*30)
             await event.message.answer(f"🎯 {cat_key}")
         for item in items:
             await event.message.answer(f"{counter}. {item.message_text}", format="markdown")
