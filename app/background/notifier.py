@@ -14,7 +14,7 @@ from app.database.model_3 import User, AsyncSessionLocal
 logger = logging.getLogger(__name__)
 
 # Интервал опроса в секундах
-POLL_INTERVAL = 300  # 5 минут
+POLL_INTERVAL = 10  # 5 минут
 
 
 async def _get_max_message_id() -> int:
@@ -65,10 +65,7 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
     for cat_key, cat_events in grouped.items():
         lines = [f"🔔 Новые мероприятия: {cat_key}\n"]
         for i, event in enumerate(cat_events, start=1):
-            text = f"{i}. {event.message_text}"
-            if event.post_url:
-                text += f"\n\n🔗 Оригинал: {event.post_url}"
-            lines.append(text)
+            lines.append(f"{i}. {event.message_text}")
 
         message_text = "\n\n".join(lines)
 

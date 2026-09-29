@@ -15,7 +15,6 @@ from pymax import (
     SyncOverrides,
     WebClient,
 )
-from pymax.types.domain.enums import LinkType
 from sqlalchemy import select
 
 from app.Analyzer.analyzer import analyzer
@@ -60,11 +59,44 @@ class ChannelParser:
         Иначе — возвращаем само сообщение.
         """
         try:
-            if msg.link and msg.link.type == LinkType.FORWARD:
-                return msg.link.message
+            link = getattr(msg, "link", None)
+            if link and getattr(link, "message", None):
+                return link.message
         except Exception:
             pass
         return msg
+
+    @staticmethod
+    def _extract_missing_links(real_msg) -> list[str]:
+        """
+        Извлекает URL из elements, которых НЕТ в тексте.
+        Возвращает список URL для дописывания.
+        """
+        text = getattr(real_msg, "text", None) or ""
+        elements = getattr(real_msg, "elements", None) or []
+
+        missing: list[str] = []
+
+        for el in elements:
+            if getattr(el, "type", None) != "LINK":
+                continue
+
+            attrs = getattr(el, "attributes", None)
+            url = getattr(attrs, "url", None) if attrs else None
+            if not url:
+                continue
+
+            # Пропускаем, если URL уже есть в тексте
+            if url in text:
+                continue
+
+            # Пропускаем дубликаты в самом списке
+            if url in missing:
+                continue
+
+            missing.append(url)
+
+        return missing
 
     async def run(self, channels: list[int], limit: int = 15) -> None:
         """
@@ -102,6 +134,7 @@ class ChannelParser:
                     # Если сообщение пересланное — работаем с оригиналом
                     real_msg = self._extract_real_message(msg)
 
+                    # ID сообщения (для дедупликации и сохранения)
                     real_id = getattr(real_msg, "id", None)
                     if not real_id:
                         continue
@@ -111,53 +144,40 @@ class ChannelParser:
                     if not text:
                         continue
 
-                    # Прогоняем сообщение через полный эвристический анализатор
+                    # Полный анализ: категория, локация, дата, is_event
                     analysis = analyzer.analyze_message(text)
 
                     if not analysis["is_event"]:
                         garbage_total += 1
                         logger.debug(
                             "Пост %s пропущен: %s",
-                            real_msg.id, analysis["reason"],
+                            real_id, analysis["reason"],
                         )
                         continue
 
-                    # Достаём категорию
+                    # Категория
                     category = analysis["category"]
                     if not category:
                         garbage_total += 1
                         logger.debug(
                             "Пост %s пропущен: категория не определена",
-                            real_msg.id,
+                            real_id,
                         )
                         continue
 
-                    # Преобразуем строковую дату "YYYY-MM-DD" обратно в datetime
+                    # Дата события
                     event_date = (
                         datetime.strptime(analysis["date"], "%Y-%m-%d")
                         if analysis["date"]
                         else None
                     )
 
-                    # --- ССЫЛКА НА ОРИГИНАЛ ---
-                    # Ищем в elements ссылку вида max.ru/канал/код_поста
-                    post_url = None
-                    elements = getattr(real_msg, "elements", None) or []
-                    for el in elements:
-                        if getattr(el, "type", None) == "LINK":
-                            attrs = getattr(el, "attributes", None)
-                            url = getattr(attrs, "url", None) if attrs else None
-                            if not url or "max.ru/" not in url:
-                                continue
-
-                            # Разбираем URL: max.ru/<segment1>/<segment2>
-                            after_domain = url.split("max.ru/", 1)[1].strip("/")
-                            parts = after_domain.split("/")
-
-                            # Ссылка на пост: ровно 2 сегмента (канал/код)
-                            if len(parts) == 2 and parts[0] and parts[1]:
-                                post_url = url
-                                break
+                    # --- ВШИТЫЕ ССЫЛКИ (анкоры) ---
+                    # Извлекаем URL из elements, которых нет в тексте.
+                    missing_links = self._extract_missing_links(real_msg)
+                    full_text = text
+                    if missing_links:
+                        full_text += "\n\n🔗 " + "\n🔗 ".join(missing_links)
 
                     # --- ДЕДУПЛИКАЦИЯ ---
                     existing = await session.execute(
@@ -172,9 +192,8 @@ class ChannelParser:
                     # --- СОХРАНЕНИЕ ---
                     session.add(ParsedMessage(
                         message_id=str(real_id),
-                        message_text=text,
+                        message_text=full_text,
                         category=category,
-                        post_url=post_url,
                         event_date=event_date,
                     ))
                     saved_total += 1

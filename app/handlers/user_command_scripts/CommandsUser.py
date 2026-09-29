@@ -174,7 +174,7 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
         user_sessions.pop(user_id, None)
         return
 
-        await event.message.answer(f"📌 {title}\n")
+    await event.message.answer(f"📌 {title}\n")
 
     # Показываем заголовок категории только если их несколько
     show_category_headers = len(grouped) > 1
@@ -184,10 +184,7 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
         if show_category_headers:
             await event.message.answer(f"🎯 {cat_key}")
         for item in items:
-            text = f"{counter}. {item.message_text}"
-            if item.post_url:
-                text += f"\n\n🔗 Оригинал: {item.post_url}"
-            await event.message.answer(text)
+            await event.message.answer(f"{counter}. {item.message_text}")
             counter += 1
             await asyncio.sleep(0.3)
 
