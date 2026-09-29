@@ -22,14 +22,14 @@ async def clean_expired_events() -> None:
     """
     now = datetime.now()
     cutoff_no_date = now - NO_DATE_TTL
-    yesterday_str = (now.date() - timedelta(days=1)).strftime("%Y-%m-%d")
+    yesterday = now - timedelta(days=1)   # datetime, не строка
 
     async with async_session() as session:
         try:
             # 1. Выбираем все посты, у которых истек срок жизни
             query = select(ParsedMessage).where(
                 (ParsedMessage.event_date.is_(None) & (ParsedMessage.created_at < cutoff_no_date)) |
-                (ParsedMessage.event_date.isnot(None) & (ParsedMessage.event_date < yesterday_str))
+                (ParsedMessage.event_date.isnot(None) & (ParsedMessage.event_date < yesterday))
             )
             result = await session.execute(query)
             expired_messages = result.scalars().all()

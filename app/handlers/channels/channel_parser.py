@@ -53,6 +53,20 @@ class ChannelParser:
         )
 
     @staticmethod
+    def _extract_real_message(msg):
+        """
+        Если сообщение пересланное — берём оригинал внутри link.message.
+        Иначе — возвращаем само сообщение.
+        """
+        try:
+            link = getattr(msg, "link", None)
+            if link and getattr(link, "message", None):
+                return link.message
+        except Exception:
+            pass
+        return msg
+
+    @staticmethod
     def _inject_links_into_text(real_msg) -> str:
         """
         Вшивает ссылки обратно в анкоры в формате markdown:
