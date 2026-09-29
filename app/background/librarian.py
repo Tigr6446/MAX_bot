@@ -12,7 +12,7 @@ LIBRARIAN_INTERVAL = 120
 async def clean_expired_events() -> None:
     # Удаляет устаревшие события и посты без даты старше 5 дней
     now = datetime.now(timezone.utc).replace(tzinfo=None)  # naive UTC
-    five_days_ago = now - timedelta(days=5)
+    five_days_ago = now - timedelta(minutes=2)
     
     # Даем событию полностью пройти (удаляем на следующий день)
     yesterday = now - timedelta(days=1)
