@@ -184,7 +184,7 @@ async def _send_next_page(event: MessageCreated, user_id: int, session: dict) ->
         if show_category_headers:
             await event.message.answer(f"🎯 {cat_key}")
         for item in items:
-            await event.message.answer(f"{counter}. {item.message_text}")
+            await event.message.answer(f"{counter}. {item.message_text}", format="markdown")
             counter += 1
             await asyncio.sleep(0.3)
 

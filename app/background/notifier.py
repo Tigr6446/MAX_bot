@@ -14,7 +14,7 @@ from app.database.model_3 import User, AsyncSessionLocal
 logger = logging.getLogger(__name__)
 
 # Интервал опроса в секундах
-POLL_INTERVAL = 10  # 5 минут
+POLL_INTERVAL = 60  # 5 минут - 300
 
 
 async def _get_max_message_id() -> int:
@@ -71,7 +71,7 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
 
         for chat_id in chat_ids:
             try:
-                await bot.send_message(chat_id=chat_id, text=message_text)
+                await bot.send_message(chat_id=chat_id, text=message_text, format="markdown")
                 await asyncio.sleep(0.3)
             except Exception as e:
                 logger.exception(

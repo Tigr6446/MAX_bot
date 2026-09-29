@@ -53,50 +53,62 @@ class ChannelParser:
         )
 
     @staticmethod
-    def _extract_real_message(msg):
+    def _inject_links_into_text(real_msg) -> str:
         """
-        Если сообщение пересланное — берём оригинал внутри link.message.
-        Иначе — возвращаем само сообщение.
-        """
-        try:
-            link = getattr(msg, "link", None)
-            if link and getattr(link, "message", None):
-                return link.message
-        except Exception:
-            pass
-        return msg
+        Вшивает ссылки обратно в анкоры в формате markdown:
+        [анкор](url).
 
-    @staticmethod
-    def _extract_missing_links(real_msg) -> list[str]:
-        """
-        Извлекает URL из elements, которых НЕТ в тексте.
-        Возвращает список URL для дописывания.
+        Работает по позициям from/length из elements.
+        Если URL уже есть в тексте — пропускает (дубликат).
+        Заменяет с конца, чтобы позиции не сдвигались.
         """
         text = getattr(real_msg, "text", None) or ""
         elements = getattr(real_msg, "elements", None) or []
 
-        missing: list[str] = []
-
+        # Собираем LINK-элементы с позициями и URL
+        links: list[tuple[int, int, str]] = []
         for el in elements:
             if getattr(el, "type", None) != "LINK":
                 continue
 
+            from_pos = getattr(el, "from", None)
+            length = getattr(el, "length", None)
             attrs = getattr(el, "attributes", None)
             url = getattr(attrs, "url", None) if attrs else None
-            if not url:
+
+            if from_pos is None or length is None or not url:
                 continue
 
-            # Пропускаем, если URL уже есть в тексте
+            # Пропускаем, если URL уже есть в тексте (обычная ссылка)
             if url in text:
                 continue
 
-            # Пропускаем дубликаты в самом списке
-            if url in missing:
+            links.append((from_pos, length, url))
+
+        if not links:
+            return text
+
+        # Сортируем по позиции в обратном порядке — замена не сдвигает индексы
+        links.sort(key=lambda x: x[0], reverse=True)
+
+        result = text
+        for from_pos, length, url in links:
+            # Страховка от выхода за границы
+            if from_pos < 0 or from_pos + length > len(result):
                 continue
 
-            missing.append(url)
+            anchor = result[from_pos:from_pos + length]
 
-        return missing
+            if not anchor.strip():
+                continue
+
+            # Экранируем квадратные скобки в анкоре
+            anchor_safe = anchor.replace("[", "\\[").replace("]", "\\]")
+
+            replacement = f"[{anchor_safe}]({url})"
+            result = result[:from_pos] + replacement + result[from_pos + length:]
+
+        return result
 
     async def run(self, channels: list[int], limit: int = 15) -> None:
         """
@@ -173,11 +185,7 @@ class ChannelParser:
                     )
 
                     # --- ВШИТЫЕ ССЫЛКИ (анкоры) ---
-                    # Извлекаем URL из elements, которых нет в тексте.
-                    missing_links = self._extract_missing_links(real_msg)
-                    full_text = text
-                    if missing_links:
-                        full_text += "\n\n🔗 " + "\n🔗 ".join(missing_links)
+                    full_text = self._inject_links_into_text(real_msg)
 
                     # --- ДЕДУПЛИКАЦИЯ ---
                     existing = await session.execute(
