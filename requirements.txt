@@ -1,4 +1,4 @@
-maxapi[fastapi]
+maxapi-python[fastapi]
 sqlalchemy[asyncio]
 asyncpg
 pydantic-settings
@@ -6,4 +6,11 @@ uvicorn[standard]
 httpx
 python-dotenv
 playwright
-maxapi-python
+
+beautifulsoup4
+requests
+
+
+
+
+

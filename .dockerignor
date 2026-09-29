@@ -1,0 +1,16 @@
+.git
+.gitignore
+.venv
+venv_max_bot
+__pycache__
+*.pyc
+*.pyo
+.env
+*.env
+!.env.example
+cache/
+project_dump.txt
+*.md
+!README.md
+.vscode
+.idea
