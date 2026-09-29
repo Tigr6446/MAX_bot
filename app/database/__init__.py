@@ -7,6 +7,8 @@ from app.database.model_1 import (
     init_db,
 )
 
+from app.database.model_4 import ProcessedMessage
+
 __all__ = [
     "Base",
     "engine",
