@@ -18,7 +18,7 @@ from pymax import (
 from sqlalchemy import select
 
 from app.Analyzer.analyzer import analyzer
-from app.database.model_1 import ParsedMessage, async_session
+from app.database import ParsedMessage, ProcessedMessage, async_session
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +117,6 @@ class ChannelParser:
         channels — список chat_id каналов (числа).
         limit — сколько последних постов тянуть из каждого канала.
         """
-        # PyMax.start() не возвращает управление — он живёт в фоне,
-        # слушая события. Поэтому запускаем его как отдельную задачу.
         start_task = asyncio.create_task(self.client.start())
 
         # Даём клиенту подключиться и залогиниться
@@ -146,9 +144,27 @@ class ChannelParser:
                     # Если сообщение пересланное — работаем с оригиналом
                     real_msg = self._extract_real_message(msg)
 
-                    # ID сообщения (для дедупликации и сохранения)
+                    # ID сообщения
                     real_id = getattr(real_msg, "id", None)
                     if not real_id:
+                        continue
+
+                    str_real_id = str(real_id)
+
+                    # --- ДЕДУПЛИКАЦИЯ (Проверка активной БД и архива) ---
+                    in_active = await session.execute(
+                        select(ParsedMessage.message_id).where(
+                            ParsedMessage.message_id == str_real_id
+                        )
+                    )
+                    in_processed = await session.execute(
+                        select(ProcessedMessage.message_id).where(
+                            ProcessedMessage.message_id == str_real_id
+                        )
+                    )
+
+                    if in_active.scalar_one_or_none() or in_processed.scalar_one_or_none():
+                        skipped_total += 1
                         continue
 
                     # Текст из оригинала
@@ -161,9 +177,11 @@ class ChannelParser:
 
                     if not analysis["is_event"]:
                         garbage_total += 1
+                        # Сохраняем мусор в архив, чтобы не анализировать его снова
+                        await session.merge(ProcessedMessage(message_id=str_real_id))
                         logger.debug(
-                            "Пост %s пропущен: %s",
-                            real_id, analysis["reason"],
+                            "Пост %s пропущен и заархивирован: %s",
+                            str_real_id, analysis["reason"],
                         )
                         continue
 
@@ -171,9 +189,11 @@ class ChannelParser:
                     category = analysis["category"]
                     if not category:
                         garbage_total += 1
+                        # Сохраняем мусор в архив
+                        await session.merge(ProcessedMessage(message_id=str_real_id))
                         logger.debug(
-                            "Пост %s пропущен: категория не определена",
-                            real_id,
+                            "Пост %s пропущен и заархивирован: категория не определена",
+                            str_real_id,
                         )
                         continue
 
@@ -187,19 +207,9 @@ class ChannelParser:
                     # --- ВШИТЫЕ ССЫЛКИ (анкоры) ---
                     full_text = self._inject_links_into_text(real_msg)
 
-                    # --- ДЕДУПЛИКАЦИЯ ---
-                    existing = await session.execute(
-                        select(ParsedMessage).where(
-                            ParsedMessage.message_id == str(real_id)
-                        )
-                    )
-                    if existing.scalar_one_or_none():
-                        skipped_total += 1
-                        continue
-
                     # --- СОХРАНЕНИЕ ---
                     session.add(ParsedMessage(
-                        message_id=str(real_id),
+                        message_id=str_real_id,
                         message_text=full_text,
                         category=category,
                         event_date=event_date,
@@ -210,8 +220,7 @@ class ChannelParser:
 
             logger.info("Канал %s обработан", chat_id)
 
-            # Пауза между каналами (кроме последнего),
-            # чтобы не долбить API MAX
+            # Пауза между каналами (кроме последнего)
             if i < len(channels) - 1:
                 await asyncio.sleep(2)
 

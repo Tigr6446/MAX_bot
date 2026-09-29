@@ -1,45 +1,50 @@
 ﻿import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
-from sqlalchemy import delete
+from datetime import datetime, timedelta
+
+from sqlalchemy import select
+
 from app.database.model_1 import ParsedMessage, async_session
+from app.database.model_4 import ProcessedMessage
 
 logger = logging.getLogger(__name__)
 
-# Интервал проверки: 6 часов (в секундах - 21600)
-LIBRARIAN_INTERVAL = 120
+# --- Конфигурация Библиотекаря ---
+LIBRARIAN_INTERVAL = 120  # Интервал проверки базы (в секундах)
+NO_DATE_TTL = timedelta(minutes=2)  # Время жизни постов БЕЗ даты (для тестов: 2 минуты, для прода: timedelta(days=5))
+
 
 async def clean_expired_events() -> None:
-    # Удаляет устаревшие события и посты без даты старше 5 дней
-    now = datetime.now(timezone.utc).replace(tzinfo=None)  # naive UTC
-    five_days_ago = now - timedelta(minutes=2)
-    
-    # Даем событию полностью пройти (удаляем на следующий день)
-    yesterday = now - timedelta(days=1)
+    """
+    Ищет устаревшие события и посты без даты,
+    заносит их message_id в архив ProcessedMessage
+    и удаляет из активной таблицы ParsedMessage.
+    """
+    now = datetime.now()
+    cutoff_no_date = now - NO_DATE_TTL
+    yesterday_str = (now.date() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     async with async_session() as session:
         try:
-            # Удаляем посты БЕЗ даты окончания, которым больше 5 дней с момента парсинга
-            result_no_date = await session.execute(
-                delete(ParsedMessage).where(
-                    ParsedMessage.event_date.is_(None),
-                    ParsedMessage.created_at < five_days_ago
-                )
+            # 1. Выбираем все посты, у которых истек срок жизни
+            query = select(ParsedMessage).where(
+                (ParsedMessage.event_date.is_(None) & (ParsedMessage.created_at < cutoff_no_date)) |
+                (ParsedMessage.event_date.isnot(None) & (ParsedMessage.event_date < yesterday_str))
             )
-            
-            # даляем посты с датой окончания, которая уже ПРОШЛА (учитывая весь день события)
-            result_expired = await session.execute(
-                delete(ParsedMessage).where(
-                    ParsedMessage.event_date.isnot(None),
-                    ParsedMessage.event_date < yesterday 
+            result = await session.execute(query)
+            expired_messages = result.scalars().all()
+
+            if expired_messages:
+                # 2. Переносим ID в архив и удаляем из рабочей таблицы
+                for msg in expired_messages:
+                    await session.merge(ProcessedMessage(message_id=msg.message_id))
+                    await session.delete(msg)
+
+                await session.commit()
+                logger.info(
+                    "Библиотекарь очистил базу: заархивировано и удалено записей: %d",
+                    len(expired_messages),
                 )
-            )
-            
-            await session.commit()
-            
-            deleted_count = (result_no_date.rowcount or 0) + (result_expired.rowcount or 0)
-            if deleted_count > 0:
-                logger.info("Библиотекарь очистил базу: удалено устаревших записей: %d", deleted_count)
             else:
                 logger.debug("Библиотекарь проверил базу: удалять нечего")
 
@@ -47,8 +52,9 @@ async def clean_expired_events() -> None:
             logger.exception("Ошибка в работе Библиотекаря: %s", e)
             await session.rollback()
 
+
 async def librarian_loop() -> None:
-    # Бесконечный фоновый цикл Библиотекаря
+    """Бесконечный фоновый цикл Библиотекаря."""
     logger.info("Фоновая задача 'Библиотекарь' запущена")
     while True:
         await clean_expired_events()
