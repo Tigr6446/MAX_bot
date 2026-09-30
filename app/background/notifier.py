@@ -93,7 +93,7 @@ async def _notify_users(bot, events: list[ParsedMessage]) -> None:
             cat_events = grouped.get(cat_key)
             if not cat_events:
                 continue
-            lines.append("--------------")
+            lines.append("-"*40)
             lines.append(f"🎯 {cat_key}")
             for i, event in enumerate(cat_events, start=1):
                 lines.append(f"{i}. {event.message_text}")
