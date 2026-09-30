@@ -1,4 +1,5 @@
 maxapi-python
+maxapi
 fastapi
 sqlalchemy[asyncio]
 asyncpg
