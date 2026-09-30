@@ -11,9 +11,11 @@ from maxapi.webhook.fastapi import FastAPIMaxWebhook
 
 from app.config import settings
 
-from app.database.model_1 import ParsedMessage, init_db
-from app.database.model_3 import User
-from app.database.model_4 import ProcessedMessage
+import app.database.model_1
+import app.database.model_3
+import app.database.model_4
+
+from app.database.model_1 import init_db
 
 from app.handlers.user_command_scripts.CommandsUser import handle_user_command
 from app.handlers.user_command_scripts.onbording import (
