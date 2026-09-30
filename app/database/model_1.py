@@ -59,5 +59,10 @@ class ParsedMessage(Base):
 
 async def init_db() -> None:
     """Создаёт таблицы при старте приложения."""
+
+        # Явно импортируем все модели, чтобы SQLAlchemy их увидел # noqa
+    import app.database.model_3  # noqa
+    import app.database.model_4  # noqa
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
