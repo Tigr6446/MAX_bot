@@ -14,7 +14,7 @@ from app.database.model_3 import User, AsyncSessionLocal
 logger = logging.getLogger(__name__)
 
 # Интервал опроса в секундах
-POLL_INTERVAL = 60  # 5 минут - 300
+POLL_INTERVAL = 300  # 5 минут - 300 сек
 
 
 async def _get_max_message_id() -> int:

@@ -7,7 +7,6 @@ from app.database.model_1 import (
     init_db,
 )
 
-from app.database.model_2 import WebEvent
 from app.database.model_3 import User
 
 from app.database.model_4 import ProcessedMessage

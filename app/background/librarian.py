@@ -10,8 +10,8 @@ from app.database.model_4 import ProcessedMessage
 logger = logging.getLogger(__name__)
 
 # --- Конфигурация Библиотекаря ---
-LIBRARIAN_INTERVAL = 120  # Интервал проверки базы (в секундах)
-NO_DATE_TTL = timedelta(minutes=2)  # Время жизни постов БЕЗ даты (для тестов: 2 минуты, для прода: timedelta(days=5))
+LIBRARIAN_INTERVAL = 21600  # Интервал проверки базы (в секундах)
+NO_DATE_TTL = timedelta(days=5)  # Время жизни постов БЕЗ даты
 
 
 async def clean_expired_events() -> None:
