@@ -93,7 +93,7 @@ class ChannelParser:
                 continue
 
             # Пропускаем почты
-            if url.startswith("mailto:") or ("@" in url and not url.startswith("http")) or ("mail" in url):
+            if url.startswith("mailto:") or ("@" in url and not url.startswith("http")) or ("mail" in url) or ("forms." in url):
                 continue
 
             # Пропускаем, если URL уже есть в тексте (обычная ссылка)
