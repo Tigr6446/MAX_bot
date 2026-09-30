@@ -5,8 +5,4 @@ sqlalchemy[asyncio]
 asyncpg
 pydantic-settings
 uvicorn[standard]
-httpx
 python-dotenv
-playwright
-
-

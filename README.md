@@ -14,40 +14,6 @@
 мероприятии
 - При необходимости изменить параметры профиля с помомщью команды /settings
 
-# Cостав и архитектура решения
-
-max_event_bot/
-├── main.py                          # Точка входа: FastAPI + вебхук MAX
-├── requirements.txt                 # Зависимости
-├── .env.example                     # Шаблон переменных окружения
-├── .dockerignore                    # Исключения для Docker
-├── README.md                        # Этот файл
-├── dokerfiles/
-│   ├── Dockerfile                   # Образ приложения
-│   └── docker-compose.yml           # Оркестрация: bot + postgres
-└── app/
-├── config.py                    # Настройки через pydantic-settings
-├── Analyzer/
-│   ├── analyzer.py              # Эвристический анализатор текста
-│   └── data.json                # Словари категорий, регионов, маркеров
-├── background/
-│   ├── notifier.py              # Фоновая рассылка новых событий
-│   └── librarian.py             # Очистка устаревших записей
-├── database/
-│   ├── model_1.py               # ParsedMessage + engine
-│   ├── model_3.py               # User
-│   ├── model_4.py               # ProcessedMessage (архив)
-│   └── requests.py              # Запросы к БД
-└── handlers/
-├── channels/
-│   └── channel_parser.py    # Парсер каналов MAX
-├── user_command_scripts/
-│   ├── CommandsUser.py      # Обработка команд пользователя
-│   ├── onbording.py         # Онбординг (FSM)
-│   └── Settings.py          # Настройки профиля
-└── web_parsing/
-└── parserDobro.py       # Парсер dobro.ru (Playwright)
-
 # Стек
 
 - Python 3.12
@@ -61,7 +27,7 @@ max_event_bot/
 - `main.py` — точка входа, FastAPI + вебхук MAX.
 - `app/handlers/` — обработчики команд и онбординга.
 - `app/handlers/channels/` — парсер каналов MAX.
-- `app/handlers/user_command_scripts/` — команды пользователя, настройки.
+- `app/handlers/user_command_scripts/` — команды пользователя, настройки, регистрация пользователя.
 - `app/Analyzer/` — эвристический анализатор текста.
 - `app/background/` — фоновые задачи (парсер, библиотекарь).
 - `app/database/` — модели и запросы к PostgreSQL.
@@ -114,18 +80,10 @@ sqlalchemy[asyncio] + asyncpg - ORM и драйвер PostgreSQL
 
 pydantic-settings - настройки
 
-httpx - HTTP-клиент
-
 python-dotenv - загрузка .env
-
-beautifulsoup4, requests - парсинг сайтов
-
-playwright - парсинг dobro.ru
 
 # Системные
 
 python 3.12
 
 PostgreSQL 16
-
-Chromium (для playwright, устанавливается в Dockerfile)
